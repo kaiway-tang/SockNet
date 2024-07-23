@@ -15,6 +15,9 @@ public class ClientTest : MonoBehaviour
     public string uri;
     public Text outputText;
 
+    [SerializeField] MeshRenderer cubeMesh;
+    [SerializeField] Material redMat;
+
     async void Start()
     {
         webSocket = new ClientWebSocket();
@@ -47,8 +50,9 @@ public class ClientTest : MonoBehaviour
             var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
             Debug.Log($"Received message: {message}");
-            outputText.text = $"Received: {message}";
-        }
+            //outputText.text = $"Received: {message}";
+            cubeMesh.material = redMat;
+        }        
     }
 
     private void OnApplicationQuit()
