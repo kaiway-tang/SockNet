@@ -1,18 +1,12 @@
-// WebSocketClient.cs
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System;
-using System.Text;
-using System.Net.WebSockets;
-using System.Threading;
-using System.Threading.Tasks;
+using NativeWebSocket;
+using System.Collections;
 
 public class ClientTest : MonoBehaviour
 {
-    private ClientWebSocket webSocket = null;
-    public string uri;
+    private WebSocket webSocket;
+    public string uri = "ws://47.229.102.209:3300";
     public Text outputText;
 
     [SerializeField] MeshRenderer cubeMesh;
@@ -20,47 +14,105 @@ public class ClientTest : MonoBehaviour
 
     async void Start()
     {
-        webSocket = new ClientWebSocket();
-        Debug.Log("Attempting: " + uri);
-        await webSocket.ConnectAsync(new Uri(uri), CancellationToken.None);
-        Debug.Log("Connected to server");
+        webSocket = new WebSocket(uri);
 
-        // Send a test message
-        string message = "Hello, Server!";
-        await SendMessageAsync(message);
-
-        // Start receiving messages
-        await ReceiveMessages();
-    }
-
-    async Task SendMessageAsync(string message)
-    {
-        var messageBytes = Encoding.UTF8.GetBytes(message);
-        var segment = new ArraySegment<byte>(messageBytes);
-        await webSocket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
-        Debug.Log($"Sent message: {message}");
-    }
-
-    async Task ReceiveMessages()
-    {
-        var buffer = new byte[1024];
-
-        while (webSocket.State == WebSocketState.Open)
+        webSocket.OnOpen += () =>
         {
-            var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+            Debug.Log("Connected to server");
+            SendMessage("Hello, Server!");
+        };
+
+        webSocket.OnMessage += (bytes) =>
+        {
+            var message = System.Text.Encoding.UTF8.GetString(bytes);
             Debug.Log($"Received message: {message}");
-            //outputText.text = $"Received: {message}";
-            cubeMesh.material = redMat;
-        }        
+            // Update UI on the main thread
+            MainThreadDispatcher.RunOnMainThread(() =>
+            {
+                outputText.text = $"Received: {message}";
+                cubeMesh.material = redMat;
+            });
+        };
+
+        webSocket.OnError += (e) =>
+        {
+            Debug.LogError($"WebSocket error: {e}");
+        };
+
+        webSocket.OnClose += (e) =>
+        {
+            Debug.Log("WebSocket closed");
+        };
+
+        // Connect to the server
+        await webSocket.Connect();
     }
 
-    private void OnApplicationQuit()
+    void Update()
     {
-        if (webSocket != null)
+#if !UNITY_WEBGL || UNITY_EDITOR
+        webSocket.DispatchMessageQueue();
+#endif
+    }
+
+    async void SendMessage(string message)
+    {
+        if (webSocket.State == WebSocketState.Open)
         {
-            webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
-            webSocket.Dispose();
+            await webSocket.SendText(message);
+            Debug.Log($"Sent message: {message}");
+        }
+        else
+        {
+            Debug.LogWarning("WebSocket is not open. Cannot send message.");
+        }
+    }
+
+    private async void OnApplicationQuit()
+    {
+        if (webSocket != null && webSocket.State == WebSocketState.Open)
+        {
+            await webSocket.Close();
+        }
+    }
+}
+
+// Helper class to run actions on the main thread
+public class MainThreadDispatcher : MonoBehaviour
+{
+    private static readonly System.Collections.Generic.Queue<System.Action> executionQueue = new System.Collections.Generic.Queue<System.Action>();
+
+    public static MainThreadDispatcher Instance { get; private set; }
+
+    void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(this.gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    void Update()
+    {
+        lock (executionQueue)
+        {
+            while (executionQueue.Count > 0)
+            {
+                executionQueue.Dequeue().Invoke();
+            }
+        }
+    }
+
+    public static void RunOnMainThread(System.Action action)
+    {
+        lock (executionQueue)
+        {
+            executionQueue.Enqueue(action);
         }
     }
 }
