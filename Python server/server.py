@@ -1,28 +1,16 @@
+# server.py
 import asyncio
 import websockets
-from websockets import WebSocketServerProtocol
 
-async def echo(websocket: WebSocketServerProtocol, path):
+async def echo(websocket, path):
     async for message in websocket:
         print(f"Received message: {message}")
         await websocket.send(message)
 
 async def main():
-    server = await websockets.serve(
-        echo,
-        "0.0.0.0",
-        3300,
-        process_request=add_cors_headers
-    )
-    await server.wait_closed()
-
-def add_cors_headers(path, request_headers):
-    return {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    async with websockets.serve(echo, "0.0.0.0", 3300):
+        await asyncio.Future()  # run forever
 
 if __name__ == "__main__":
-    print('Server starting...')
+    print('Going!')
     asyncio.run(main())

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Example</title>
+</head>
+<body>
+    <h1>WebSocket Example</h1>
+    <button id="sendMessage">Send 'hi'</button>
+    <script>
+        // Create a WebSocket connection
+        const socket = new WebSocket('ws://47.229.102.209:3300');
+    
+        // When the WebSocket connection is open
+        socket.addEventListener('open', (event) => {
+            console.log('WebSocket is open now.');
+        });
+    
+        // When a message is received from the server
+        socket.addEventListener('message', (event) => {
+            console.log('Message from server:', event.data);
+        });
+    
+        // When the WebSocket connection is closed
+        socket.addEventListener('close', (event) => {
+            console.log('WebSocket is closed now.');
+        });
+    
+        // When an error occurs with the WebSocket connection
+        socket.addEventListener('error', (event) => {
+            console.error('WebSocket error:', event);
+        });
+    
+        // Add event listener to the button to send 'hi' when clicked
+        document.getElementById('sendMessage').addEventListener('click', () => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send('hi');
+                console.log('Sent: hi');
+            } else {
+                console.error('WebSocket is not open.');
+            }
+        });
+    </script>    
+</body>
+</html>
