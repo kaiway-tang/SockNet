@@ -5,6 +5,10 @@ using System.Runtime.InteropServices;
 
 public class JSTest : MonoBehaviour
 {
+#if False
+    [SerializeField] MeshRenderer cubeMesh;
+    [SerializeField] Material red;
+
     [DllImport("__Internal")]
     private static extern void AllInOne();
 
@@ -14,10 +18,28 @@ public class JSTest : MonoBehaviour
     [DllImport("__Internal")]
     private static extern void HelloString(string str);
 
+    [DllImport("__Internal")]
+    private static extern void Bounce();
+
     void Start()
+    {
+        Invoke("Ping", 1);
+    }
+
+    void Ping()
     {
         AllInOne();
         Hello();
         HelloString("This is a string.");
+        Bounce();
     }
+
+    private void JSM(string message)
+    {
+        if (message == "red")
+        {
+            cubeMesh.material = red;
+        }        
+    }
+#endif
 }
