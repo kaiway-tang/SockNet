@@ -2,12 +2,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkObject
 {
     [SerializeField] float speed;
     [SerializeField] float jumpPower;
 
-    [SerializeField] Transform PlayerObj;
+    public Transform PlayerObj;
     [SerializeField] float lerpRate;
 
     [SerializeField] Transform camTrfm;
@@ -15,9 +15,21 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] Rigidbody rb;
     [SerializeField] bool isLocal;
-    // Start is called before the first frame update
-    void Start()
+
+    public static ushort playerObjID;
+
+    public static PlayerController self;
+
+    private void Awake()
     {
+        PlayerController.self = GetComponent<PlayerController>();
+    }
+
+    new void Start()
+    {
+        objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>(), true);
+        playerObjID = objID;
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }

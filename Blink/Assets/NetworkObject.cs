@@ -4,15 +4,20 @@ using UnityEngine;
 
 public class NetworkObject : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    public ushort objID;
+    protected void Start()
     {
-        
+        objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>());
     }
 
     // Update is called once per frame
     void Update()
     {
         
+    }
+
+    public virtual void NetworkUpdate(byte[] buffer)
+    {
+
     }
 }
