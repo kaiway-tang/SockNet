@@ -51,6 +51,12 @@ public class PlayerController : NetworkObject
         HandleRotation();
     }
 
+    public override void NetworkUpdate(byte[] buffer)
+    {
+        Debug.Log("player received: " + buffer);
+    }
+
+
     bool inputUpdate;
     bool UpdateKeyStatuses()
     {

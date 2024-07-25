@@ -6,7 +6,7 @@ public class Test : NetworkObject
 {
     public byte[] packet;
     // Start is called before the first frame update
-    void Start()
+    new void Start()
     {
         packet = new byte[4];
     }
@@ -15,7 +15,7 @@ public class Test : NetworkObject
     void Update()
     {
         packet[0] = 10;
-        Debug.Log(packet);
+        //Debug.Log(packet);
     }
 
     private void FixedUpdate()
@@ -28,10 +28,5 @@ public class Test : NetworkObject
         {
             packet[2] += 1;
         }
-    }
-
-    public override void RecvUpdate(byte[] buffer)
-    {
-        Debug.Log('received update');
     }
 }

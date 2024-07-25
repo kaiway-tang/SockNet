@@ -16,14 +16,15 @@ public class NetworkManager : MonoBehaviour
     private void Awake()
     {
         self = GetComponent<NetworkManager>();
+        InitializeBufferSizes();
     }
 
     void InitializeBufferSizes()
     {
-        playerInputBuffer = new byte[10];
+        playerInputBuffer = new byte[11];
     }
   
-    static ushort temp;
+    static int temp;
 
     // X - Y - Z - YRot - inputs
     // 2'b - 2'b - 2'b - 2'b - 1'b
@@ -36,43 +37,60 @@ public class NetworkManager : MonoBehaviour
 
         SetBufferCoords(playerInputBuffer, pos);
 
-        SetBufferUShort(playerInputBuffer, PlayerController.self.PlayerObj);
+        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 8);
 
         temp = fwd ? 8 : 0;
         temp += back ? 4 : 0;
         temp += left ? 2 : 0;
         temp += right ? 1 : 0;
 
-        Append(temp, 2);
+        playerInputBuffer[10] = (byte)temp;
 
-        //self.tmp.text = packet.ToString();
+        Debug.Log(FormatString(playerInputBuffer));
+        self.tmp.text = FormatString(playerInputBuffer);
         //SendLong(packet);
     }
 
     static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 2)
     {
-        SetBufferUShort(buffer, EncodeCoord(pos.x), 2);
-        SetBufferUShort(buffer, EncodeCoord(pos.y), 4);
-        SetBufferUShort(buffer, EncodeCoord(pos.z), 6);
+        SetBufferUShort(buffer, EncodeValue(pos.x), 2);
+        SetBufferUShort(buffer, EncodeValue(pos.y), 4);
+        SetBufferUShort(buffer, EncodeValue(pos.z), 6);
     }
 
-    static ushort EncodeCoord(float coord)
+    static ushort EncodeValue(float val, int leftShift = 100)
     {
-        temp = (ushort)(Mathf.RoundToInt(coord * 100) + HALF_SHORT);
+        temp = (Mathf.RoundToInt(val * leftShift) + HALF_SHORT);
         if (temp > 65535 || temp < 0) { temp = HALF_SHORT; }
-        return temp;
-    }
-
-    static void Append(int segment, int segLength)
-    {
-        //packet = Mathf.RoundToInt(Mathf.Pow(10, segLength)) * packet;
-        //packet += segment;
+        return (ushort)temp;
     }
 
     static void SetBufferUShort(byte[] buffer, ushort val, int startIndex = 0)
     {
         buffer[startIndex] = (byte)(val >> 8);
         buffer[startIndex + 1] = (byte)(val & 0xFF);
+    }
+
+
+
+    static Vector3 tempVect;
+    static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 2)
+    {
+        tempVect.x = DecodeValue(GetBufferUShort(buffer, startIndex));
+        tempVect.y = DecodeValue(GetBufferUShort(buffer, startIndex + 2));
+        tempVect.z = DecodeValue(GetBufferUShort(buffer, startIndex + 4));
+
+        return tempVect;
+    }
+
+    public static float DecodeValue(ushort val, int leftShift = 100)
+    {
+        return (float)(val - HALF_SHORT) / leftShift;
+    }
+
+    public static ushort GetBufferUShort(byte[] buffer, int startIndex = 0)
+    {
+        return (ushort)(buffer[startIndex] << 8 | buffer[startIndex + 1]);
     }
 
     #endregion
@@ -100,9 +118,23 @@ public class NetworkManager : MonoBehaviour
         return newID;
     }
 
-    static ushort GetBufferObjID(byte[] buffer)
+    public static ushort GetBufferObjID(byte[] buffer)
     {
         return (ushort)((buffer[0] << 8) | buffer[1]);
+    }
+
+    public static string FormatString(byte[] buffer)
+    {
+        string output = "ObjID: ";
+        output += GetBufferObjID(buffer);
+        output += ", Coords: ";
+        output += GetBufferCoords(buffer);
+        output += ", YRot: ";
+        output += DecodeValue(GetBufferUShort(buffer, 8));
+        output += ", Inputs: ";
+        output += buffer[10];
+
+        return output;
     }
     #endregion
 
@@ -133,8 +165,8 @@ public class NetworkManager : MonoBehaviour
     }
 
     public void JSM(byte[] buffer)
-    {
-        tmp.text = buffer.ToString();
+    {        
+        tmp.text = FormatString(buffer);
         ProcessUpdate(buffer);
     }
 #endif
