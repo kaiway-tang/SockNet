@@ -30,6 +30,8 @@ public class PlayerController : NetworkObject
         objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>(), true);
         playerObjID = objID;
 
+        PlayerObj.parent = null;
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
@@ -53,7 +55,17 @@ public class PlayerController : NetworkObject
 
     public override void NetworkUpdate(byte[] buffer)
     {
-        Debug.Log("player received: " + buffer);
+        if (isLocal) return;
+
+        transform.position = NetworkManager.GetBufferCoords(buffer);
+        PlayerObj.eulerAngles = new Vector3(PlayerObj.eulerAngles.x, NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 8)), PlayerObj.eulerAngles.z);
+
+        keyFwd = ((buffer[10] >> 3) & 0x01) == 1;
+        keyBack = ((buffer[10] >> 2) & 0x01) == 1;
+        keyLeft = ((buffer[10] >> 1) & 0x01) == 1;
+        keyRight = (buffer[10] & 0x01) == 1;
+
+        Update();
     }
 
 

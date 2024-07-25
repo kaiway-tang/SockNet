@@ -46,9 +46,9 @@ public class NetworkManager : MonoBehaviour
 
         playerInputBuffer[10] = (byte)temp;
 
-        Debug.Log(FormatString(playerInputBuffer));
-        self.tmp.text = FormatString(playerInputBuffer);
-        //SendLong(packet);
+        //Debug.Log(FormatString(playerInputBuffer));
+        //self.tmp.text = FormatString(playerInputBuffer);
+        Send(playerInputBuffer, 11);
     }
 
     static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 2)
@@ -74,7 +74,7 @@ public class NetworkManager : MonoBehaviour
 
 
     static Vector3 tempVect;
-    static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 2)
+    public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 2)
     {
         tempVect.x = DecodeValue(GetBufferUShort(buffer, startIndex));
         tempVect.y = DecodeValue(GetBufferUShort(buffer, startIndex + 2));
@@ -146,7 +146,7 @@ public class NetworkManager : MonoBehaviour
     private static extern void Connect(string url);
 
     [DllImport("__Internal")]
-    private static extern void Send(int high, int low);    
+    private static extern void Send(byte[] buffer, int length);    
 
     void Start()
     {
@@ -161,12 +161,13 @@ public class NetworkManager : MonoBehaviour
     public static void SendLong(long msg)
     {
         Debug.Log("send long: " + msg);
-        Send((int)(msg >> 32), (int)(msg & 0xFFFFFFFF));
+        //Send((int)(msg >> 32), (int)(msg & 0xFFFFFFFF));
     }
 
-    public void JSM(byte[] buffer)
-    {        
-        tmp.text = FormatString(buffer);
+    public void JSM(string msg)
+    {
+        byte[] buffer = System.Convert.FromBase64String(msg);
+        self.tmp.text = FormatString(buffer);
         ProcessUpdate(buffer);
     }
 #endif

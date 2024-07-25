@@ -55,20 +55,16 @@ mergeInto(LibraryManager.library, {
             // console.log('Message received from server: ' + event.data);
 
             if (event.data instanceof ArrayBuffer) {
-                // Create a DataView from the ArrayBuffer
-                var view = new DataView(event.data);
-                
-                // Extract the 64-bit integer value (little-endian)
-                var longValue = view.getBigInt64(0, true);  // true for little-endian
-
-                console.log("extract: " + view.getInt32(4, true));
-        
                 // Send the value to another function
-                SendMessage('NM', 'JSM', longValue.toString());
+                SendMessage('NM', 'JSM', arrayBufferToBase64(event.data));
             } else {
                 console.error('Received message is not an ArrayBuffer');
             }
         };
+
+        function arrayBufferToBase64(buffer) {
+            return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+        }
 
         window.webSocket.onerror = function (event) {
             console.log('WebSocket error: ' + event.data);
@@ -79,7 +75,20 @@ mergeInto(LibraryManager.library, {
         };
     },
 
-    Send: function (highBits, lowBits) {
+    Send: function (bufferPtr, length) {
+        if (window.webSocket) {
+            var buffer = new Uint8Array(Module.HEAPU8.buffer, bufferPtr, length);
+            //console.log("send buffer: ", buffer);
+            
+            // Send as a binary buffer
+            //var array_buffer = new ArrayBuffer(length);
+            //var view = new DataView(buffer);
+            //view.setBigInt64(0, longValue, true);  // true for little-endian
+            window.webSocket.send(buffer);
+        }
+    },
+
+    SendOld: function (highBits, lowBits) {
         if (window.webSocket) {
             var longValue = (BigInt(highBits) << BigInt(32)) | BigInt(lowBits >>> 0);
 
