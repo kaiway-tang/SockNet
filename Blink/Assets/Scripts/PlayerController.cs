@@ -1,11 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class PlayerController : NetworkObject
 {
     [SerializeField] float speed;
-    [SerializeField] float jumpPower;
+    [SerializeField] float jumpPower, dJumpMultiplier;
 
     public Transform PlayerObj;
     [SerializeField] float lerpRate;
@@ -16,6 +17,8 @@ public class PlayerController : NetworkObject
     [SerializeField] Rigidbody rb;
     [SerializeField] bool isLocal;
 
+    [SerializeField] GroundDetect groundDetect;
+    [SerializeField] HPEntity hpScript;
     public static ushort playerObjID;
 
     public static PlayerController self;
@@ -29,6 +32,7 @@ public class PlayerController : NetworkObject
     {
         objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>(), true);
         playerObjID = objID;
+        hpScript.objID = objID;
 
         PlayerObj.parent = null;
 
@@ -36,6 +40,7 @@ public class PlayerController : NetworkObject
         Cursor.lockState = CursorLockMode.Locked;
     }
 
+    float updateTimeout;
     bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
     private void Update()
     {
@@ -43,14 +48,42 @@ public class PlayerController : NetworkObject
         {
             if (UpdateKeyStatuses())
             {
-                NetworkManager.UpdatePlayerInput(transform.position, keyFwd, keyBack, keyLeft, keyRight);
+                SendNetworkUpdate();
             }
-            if (Input.GetKeyDown(KeyCode.Space)) { rb.velocity += Vector3.up * jumpPower; }
-        }               
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                if (OnGround())
+                {
+                    velocityVect = rb.velocity;
+                    velocityVect.y = jumpPower;
+                    rb.velocity = velocityVect;
+                }
+                else if (mana > 20)
+                {
+                    velocityVect = rb.velocity;
+                    velocityVect.y = jumpPower * dJumpMultiplier;
+                    rb.velocity = velocityVect;
+                    mana -= 20;
+                }
+            }
 
-        UpdateVelocity();
+            if (updateTimeout < 0)
+            {
+                SendNetworkUpdate();
+            }
+            updateTimeout -= Time.deltaTime;
 
-        HandleRotation();
+            HandleRotationInput();
+            HandleAbilities();
+        }
+
+        UpdateVelocity();        
+    }
+
+    void SendNetworkUpdate()
+    {
+        NetworkManager.UpdatePlayerInput(transform.position, keyFwd, keyBack, keyLeft, keyRight);
+        updateTimeout = 0.2f;
     }
 
     public override void NetworkUpdate(byte[] buffer)
@@ -58,7 +91,7 @@ public class PlayerController : NetworkObject
         if (isLocal) return;
 
         transform.position = NetworkManager.GetBufferCoords(buffer);
-        PlayerObj.eulerAngles = new Vector3(PlayerObj.eulerAngles.x, NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 8)), PlayerObj.eulerAngles.z);
+        targetYRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 8));        
 
         keyFwd = ((buffer[10] >> 3) & 0x01) == 1;
         keyBack = ((buffer[10] >> 2) & 0x01) == 1;
@@ -66,6 +99,40 @@ public class PlayerController : NetworkObject
         keyRight = (buffer[10] & 0x01) == 1;
 
         Update();
+    }
+
+    [SerializeField] float dashDistance;
+    [SerializeField] GameObject shuriken, clone;
+    [SerializeField] Transform firePoint;
+    float mana;
+    void HandleAbilities()
+    {
+        if (mana > 20)
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                transform.position = PlayerObj.position + camTrfm.forward * dashDistance;
+                //PlayerObj.position = transform.position;
+                mana -= 20;
+            }
+            if (Input.GetMouseButtonDown(1))
+            {
+                Instantiate(shuriken, firePoint.position, firePoint.rotation).GetComponent<Projectile>().ownerID = objID;
+                mana -= 20;
+            }
+            if (Input.GetKeyDown(KeyCode.LeftShift))
+            {
+                Instantiate(clone, PlayerObj.position, PlayerObj.rotation).GetComponent<Clone>().lerpDest = transform.position;
+                mana -= 20;
+            }
+        }
+        
+
+        if (mana < 100)
+        {
+            mana += Time.deltaTime * 10;
+            if (mana > 100) { mana = 100; }
+        }
     }
 
 
@@ -155,24 +222,39 @@ public class PlayerController : NetworkObject
         rb.velocity = velocityVect;
     }
 
-    float yMouse, xMouse;
-    void HandleRotation()
+    [SerializeField] float yMouse, xMouse;
+    void HandleRotationInput()
     {
         yMouse = -Input.GetAxis("MY") * sensitivity;      //right now camera is flipped, and rotates indefintley, so fix that and set to max 90 degrees
         xMouse = Input.GetAxis("MX") * sensitivity;
 
         camTrfm.Rotate(Vector3.right * yMouse);
-        PlayerObj.Rotate(Vector3.up * xMouse);
-    }
-
-    void HandleMovement()
-    {
+        PlayerObj.Rotate(Vector3.up * xMouse);     
         
+        if (Mathf.Abs(xMouse) > 1f && updateTimeout < 0.05f)
+        {
+            SendNetworkUpdate();
+        }
     }
 
-    // Update is called once per frame
+    bool OnGround()
+    {
+        return groundDetect.touchCount > 0;
+    }
+
+    float targetYRot;
+    Vector3 eulerAngles;
+    [SerializeReference] TextMeshProUGUI tmp;
     void FixedUpdate()
     {
-        PlayerObj.position += (transform.position - PlayerObj.position) * lerpRate;
+        //tmp.text = "Mana: " + Mathf.RoundToInt(mana).ToString();
+        PlayerObj.position += (transform.position - PlayerObj.position) * lerpRate;     
+
+        if (!isLocal)
+        {
+            eulerAngles = PlayerObj.eulerAngles;
+            eulerAngles.y = targetYRot;
+            PlayerObj.eulerAngles += (eulerAngles - PlayerObj.eulerAngles) * 0.2f;
+        }
     }
 }

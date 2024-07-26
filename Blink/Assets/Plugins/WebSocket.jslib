@@ -36,19 +36,13 @@ mergeInto(LibraryManager.library, {
         // });  
     },
 
-    CallUnityFunction: function(arg) {
-        // Call the C# function in Unity
-        if (unityInstance != null) {
-            unityInstance.SendMessage('JSH', 'JSM', arg);
-        }
-    },
-
     Connect: function (url) {
         window.webSocket = new WebSocket(UTF8ToString(url));
         window.webSocket.binaryType = 'arraybuffer';
 
         window.webSocket.onopen = function (event) {
             console.log('WebSocket connection opened');
+            SendMessage('NM', 'ConnectSuccessful');
         };
 
         window.webSocket.onmessage = function (event) {
@@ -75,7 +69,7 @@ mergeInto(LibraryManager.library, {
         };
     },
 
-    Send: function (bufferPtr, length) {
+    JSSend: function (bufferPtr, length) {
         if (window.webSocket) {
             var buffer = new Uint8Array(Module.HEAPU8.buffer, bufferPtr, length);
             //console.log("send buffer: ", buffer);

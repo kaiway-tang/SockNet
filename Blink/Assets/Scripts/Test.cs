@@ -14,8 +14,11 @@ public class Test : NetworkObject
     // Update is called once per frame
     void Update()
     {
-        packet[0] = 10;
-        //Debug.Log(packet);
+        if (Input.GetKeyDown(KeyCode.Return))
+        {
+            byte[] buffer = {0, 0, 0, 0 };
+            NetworkManager.Send(buffer);
+        }
     }
 
     private void FixedUpdate()

@@ -9,6 +9,52 @@ public class NetworkManager : MonoBehaviour
     static NetworkManager self;
     [SerializeField] TextMeshProUGUI tmp;
 
+    [SerializeField] GameObject cubeFlashInd;
+
+    #region NETWORK_OBJECTS
+    static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
+    static PlayerController[] players;
+
+    void ProcessUpdate(byte[] buffer)
+    {
+        networkObjects[GetBufferObjID(buffer)].NetworkUpdate(buffer);
+    }
+
+    public static ushort GetNewObjID(NetworkObject networkObject, bool permanent = false)
+    {
+        ushort newID = 0;
+        if (permanent)
+        {
+            newID = 0;
+        }
+        else
+        {
+            newID = 1024;
+        }
+        networkObjects.Add(newID, networkObject);
+        return newID;
+    }
+
+    public static ushort GetBufferObjID(byte[] buffer)
+    {
+        return (ushort)((buffer[0] << 8) | buffer[1]);
+    }
+
+    public static string FormatString(byte[] buffer)
+    {
+        string output = "ObjID: ";
+        output += GetBufferObjID(buffer);
+        output += ", Coords: ";
+        output += GetBufferCoords(buffer);
+        output += ", YRot: ";
+        output += DecodeValue(GetBufferUShort(buffer, 8));
+        output += ", Inputs: ";
+        output += buffer[10];
+
+        return output;
+    }
+    #endregion
+
     #region BUFFER_TRANSMISSION
 
     const ushort HALF_SHORT = 32768;
@@ -17,6 +63,17 @@ public class NetworkManager : MonoBehaviour
     {
         self = GetComponent<NetworkManager>();
         InitializeBufferSizes();
+    }
+
+    int lastSecond;
+    private void FixedUpdate()
+    {
+        tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
+        if (lastSecond != System.DateTime.Now.Second)
+        {
+            cubeFlashInd.SetActive(!cubeFlashInd.activeSelf);
+            lastSecond = System.DateTime.Now.Second;
+        }
     }
 
     void InitializeBufferSizes()
@@ -48,7 +105,8 @@ public class NetworkManager : MonoBehaviour
 
         //Debug.Log(FormatString(playerInputBuffer));
         //self.tmp.text = FormatString(playerInputBuffer);
-        Send(playerInputBuffer, 11);
+
+        Send(playerInputBuffer);
     }
 
     static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 2)
@@ -93,60 +151,29 @@ public class NetworkManager : MonoBehaviour
         return (ushort)(buffer[startIndex] << 8 | buffer[startIndex + 1]);
     }
 
-    #endregion
-
-    #region NETWORK_OBJECTS
-    static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
-
-    void ProcessUpdate(byte[] buffer)
-    {
-        networkObjects[GetBufferObjID(buffer)].NetworkUpdate(buffer);
-    }
-
-    public static ushort GetNewObjID(NetworkObject networkObject, bool permanent = false)
-    {
-        ushort newID = 0;
-        if (permanent)
-        {
-            newID = 0;
-        }
-        else
-        {
-            newID = 1024;
-        }
-        networkObjects.Add(newID, networkObject);
-        return newID;
-    }
-
-    public static ushort GetBufferObjID(byte[] buffer)
-    {
-        return (ushort)((buffer[0] << 8) | buffer[1]);
-    }
-
-    public static string FormatString(byte[] buffer)
-    {
-        string output = "ObjID: ";
-        output += GetBufferObjID(buffer);
-        output += ", Coords: ";
-        output += GetBufferCoords(buffer);
-        output += ", YRot: ";
-        output += DecodeValue(GetBufferUShort(buffer, 8));
-        output += ", Inputs: ";
-        output += buffer[10];
-
-        return output;
-    }
-    #endregion
+#endregion
 
     #region JS_PLUGIN
-
-#if UNITY_WEBGL || !UNITY_EDITOR
 
     [DllImport("__Internal")]
     private static extern void Connect(string url);
 
     [DllImport("__Internal")]
-    private static extern void Send(byte[] buffer, int length);    
+    private static extern void JSSend(byte[] buffer, int length);    
+
+    static bool connected;
+
+    public static bool Send(byte[] buffer)
+    {
+        if (connected)
+        {
+            JSSend(buffer, buffer.Length);
+            return true;
+        }
+        return false;
+    }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
 
     void Start()
     {
@@ -167,8 +194,13 @@ public class NetworkManager : MonoBehaviour
     public void JSM(string msg)
     {
         byte[] buffer = System.Convert.FromBase64String(msg);
-        self.tmp.text = FormatString(buffer);
+        //self.tmp.text = FormatString(buffer);
         ProcessUpdate(buffer);
+    }
+
+    public void ConnectSuccessful()
+    {
+        connected = true;
     }
 #endif
 }

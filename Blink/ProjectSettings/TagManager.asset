@@ -11,10 +11,10 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
-  - 
-  - 
+  - Hurtbox
+  - Hitbox
+  - Terrain
+  - GroundDetect
   - 
   - 
   - 
