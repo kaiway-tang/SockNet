@@ -31,7 +31,6 @@ def GetTime():
 
 async def HandleServerRequest(message, websocket):
     global id_end
-    print("server message: ", message)
     # client initial connection
     if message[2] == 0:
         print("new kid")

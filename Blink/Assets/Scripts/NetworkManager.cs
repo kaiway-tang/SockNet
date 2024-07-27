@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -281,47 +282,29 @@ public class NetworkManager : MonoBehaviour
     }
 
     float latency;
-    float min_lat = 9999, max_lat = 0, min_range = 9999, running_sum = 0;
-    Queue<float> latencies = new Queue<float>();
-    float send_time, server_time;
-    float running_difference;
-    int iterations = 0;
+    float[] offsets = new float[7];
+    int offsets_index;
+    float send_time;
 
     void ResolveTime(byte[] buffer)
     {
         latency = (time - send_time) / 2;
         Debug.Log("ping: " + latency);
-        latencies.Enqueue(latency);
+        offsets[offsets_index] = GetBufferUShort(buffer, 3) / 1000f + latency - time;
+        offsets_index++;
 
-        running_sum += latency;
-
-        if (latencies.Count > 4)
+        if (offsets_index >= offsets.Length)
         {
-            min_lat = 9999; max_lat = 0;
-            foreach (float latency in latencies)
-            {
-                if (latency < min_lat) { min_lat = latency; }
-                if (latency > max_lat) { max_lat = latency; }
-            }
+            Array.Sort(offsets);
+            Debug.Log("final difference: " + offsets[3]);
+            time += offsets[3];
 
-            if (max_lat - min_lat < min_range)
-            {
-                min_range = send_time;
-                running_difference = time - GetBufferUShort(buffer, 3)/1000f - (running_sum/5);
-            }
-
-            running_sum -= latencies.Dequeue();
-            iterations++;
-        }
-
-        if (iterations < 20)
-        {
-            SyncTime();
+            offsets = new float[7];
+            offsets_index = 0;
         }
         else
         {
-            Debug.Log("final difference: " + running_difference);
-
+            SyncTime();
         }
     }
 
