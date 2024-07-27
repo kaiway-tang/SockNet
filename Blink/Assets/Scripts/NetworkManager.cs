@@ -264,11 +264,7 @@ public class NetworkManager : MonoBehaviour
             }
             else if (buffer[2] == 3)
             {
-                latency = (time - send_time) / 2;
-                latencies.Enqueue(latency);
-                if (latency > max_lat) { max_lat = latency; }
-                if (latency < min_lat) { min_lat = latency; }
-                SyncTime();
+                ResolveTime(buffer);
             }
         }
 
@@ -291,24 +287,51 @@ public class NetworkManager : MonoBehaviour
     }
 
     float latency;
-    float min_lat = 9999, max_lat = 0;
-    float min_range = 9999;
-    Queue<float> latencies;
-    float send_time;
+    float min_lat = 9999, max_lat = 0, min_range = 9999, running_sum = 0;
+    Queue<float> latencies = new Queue<float>();
+    float send_time, server_time;
     float running_difference;
+    int iterations = 0;
 
-    void SyncTime()
+    void ResolveTime(byte[] buffer)
     {
-        if (latencies.Count > 2)
+        latency = (time - send_time) / 2;
+        Debug.Log("ping: " + latency);
+        latencies.Enqueue(latency);
+
+        running_sum += latency;
+
+        if (latencies.Count > 4)
         {
+            min_lat = 9999; max_lat = 0;
+            foreach (float latency in latencies)
+            {
+                if (latency < min_lat) { min_lat = latency; }
+                if (latency > max_lat) { max_lat = latency; }
+            }
+
             if (max_lat - min_lat < min_range)
             {
                 min_range = send_time;
-                running_difference = 
+                running_difference = time - GetBufferUShort(buffer, 3)/1000f - (running_sum/5);
             }
-            latencies.Dequeue();
+
+            running_sum -= latencies.Dequeue();
+            iterations++;
         }
 
+        if (iterations < 20)
+        {
+            SyncTime();
+        }
+        else
+        {
+            Debug.Log("final difference: " + running_difference);
+        }
+    }
+
+    void SyncTime()
+    {
         byte[] time_buffer = { 0, 0, 3 };
         send_time = time;
         Send(time_buffer);
