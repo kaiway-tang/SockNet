@@ -267,7 +267,8 @@ public class PlayerController : NetworkObject
         {
             eulerAngles = PlayerObj.eulerAngles;
             eulerAngles.y = targetYRot;
-            PlayerObj.eulerAngles += (eulerAngles - PlayerObj.eulerAngles) * 0.2f;
+            //PlayerObj.eulerAngles += (eulerAngles - PlayerObj.eulerAngles) * 0.2f;
+            PlayerObj.eulerAngles = eulerAngles;
         }
     }
 }

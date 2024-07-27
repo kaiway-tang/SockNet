@@ -76,11 +76,10 @@ public class NetworkManager : MonoBehaviour
         time += Time.deltaTime;
         if (time > 60) { time -= 60; }
 
-        return;
-        if (lastSecond != System.DateTime.Now.Second)
+        if (lastSecond != Mathf.RoundToInt(time))
         {
             cubeFlashInd.SetActive(!cubeFlashInd.activeSelf);
-            lastSecond = System.DateTime.Now.Second;
+            lastSecond = Mathf.RoundToInt(time);
         }
     }
 
@@ -226,20 +225,15 @@ public class NetworkManager : MonoBehaviour
     static NetworkObject newNetObj;
     static void ResolveNetObjInit(byte[] buffer)
     {
-        Debug.Log("begin resolve");
         ushort param_ID = GetBufferUShort(buffer, 3);
-        Debug.Log("handling paramID: " + param_ID);
         if (param_ID < 1024)
         {
-            Debug.Log("tempID: " + param_ID + " received ID: " + GetBufferUShort(buffer, 5));
             initializationLinker[param_ID].AssignObjID(GetBufferUShort(buffer, 5));
             initializationLinker.Remove(param_ID);
         }
         else
         {
-            Debug.Log("client received sync request: " + param_ID);
             newNetObj = Instantiate(self.networkPrefabs[param_ID - 1024]).GetComponent<NetworkObject>();
-            Debug.Log("instantiated: " + self.networkPrefabs[param_ID - 1024]);
             newNetObj.AssignObjID(GetBufferUShort(buffer, 5));
         }
     }
@@ -327,6 +321,7 @@ public class NetworkManager : MonoBehaviour
         else
         {
             Debug.Log("final difference: " + running_difference);
+
         }
     }
 
