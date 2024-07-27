@@ -104,14 +104,16 @@ public class PlayerController : NetworkObject
         if (isLocal) return;
 
         transform.position = NetworkManager.GetBufferCoords(buffer);
-        targetYRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 8));        
+        targetYRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 10));        
 
-        keyFwd = ((buffer[10] >> 3) & 0x01) == 1;
-        keyBack = ((buffer[10] >> 2) & 0x01) == 1;
-        keyLeft = ((buffer[10] >> 1) & 0x01) == 1;
-        keyRight = (buffer[10] & 0x01) == 1;
+        keyFwd = ((buffer[12] >> 3) & 0x01) == 1;
+        keyBack = ((buffer[12] >> 2) & 0x01) == 1;
+        keyLeft = ((buffer[12] >> 1) & 0x01) == 1;
+        keyRight = (buffer[12] & 0x01) == 1;
 
         Update();
+
+        //transform.position += rb.velocity * NetworkManager.GetBufferDelay(buffer, 2);
     }
 
     [SerializeField] float dashDistance;

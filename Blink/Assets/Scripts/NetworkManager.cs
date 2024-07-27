@@ -3,6 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
+using System.Net.Sockets;
+using System.Text;
+
 using TMPro;
 
 public class NetworkManager : MonoBehaviour
@@ -20,6 +23,8 @@ public class NetworkManager : MonoBehaviour
     public static PlayerController[] players;
 
     public static float time;
+
+    public bool isWebGL = false;
 
     void ProcessUpdate(byte[] buffer)
     {
@@ -56,13 +61,22 @@ public class NetworkManager : MonoBehaviour
     {
         self = GetComponent<NetworkManager>();
         InitializeBufferSizes();
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        isWebGL = true;
+#endif
     }
 
     private void Start()
-    {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        WebGLStart();
-#endif
+    {        
+        if (isWebGL)
+        {
+            WebGLStart("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
+        }
+        else
+        {
+            ExeConnect(ENV.SPVCB8L_IP, ENV.DEFAULT_PORT_INT);
+        }
     }
 
     int lastSecond;
@@ -70,16 +84,15 @@ public class NetworkManager : MonoBehaviour
     {
         //tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-        WebGLUpdate();
-#endif
+
+        if (isWebGL) { WebGLUpdate(); }        
 
         time += Time.deltaTime;
         if (time > 60) { time -= 60; }
 
         if (lastSecond != Mathf.RoundToInt(time))
         {
-            cubeFlashInd.SetActive(!cubeFlashInd.activeSelf);
+            cubeFlashInd.SetActive(Mathf.RoundToInt(time) % 2 == 0);
             lastSecond = Mathf.RoundToInt(time);
         }
     }
@@ -145,7 +158,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     static Vector3 tempVect;
-    public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 2)
+    public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 4)
     {
         tempVect.x = DecodeValue(GetBufferUShort(buffer, startIndex));
         tempVect.y = DecodeValue(GetBufferUShort(buffer, startIndex + 2));
@@ -169,9 +182,96 @@ public class NetworkManager : MonoBehaviour
         return Mathf.RoundToInt(time * 1000) - GetBufferUShort(buffer, startIndex);
     }
 
-#endregion
+    #endregion
 
-#region JS_PLUGIN
+    #region SOCKETS
+
+    private TcpClient tcpClient;
+    private NetworkStream stream;
+    private byte[] buffer = new byte[1024];
+
+    private void ExeConnect(string address, int port)
+    {
+        try
+        {
+            tcpClient = new TcpClient(address, port);
+            stream = tcpClient.GetStream();
+            Debug.Log("Connected to server.");
+            connected = true;
+
+            byte[] initial_message = { 0, 0, 0 };
+            ExeSend(initial_message);
+
+            // Start listening for incoming data
+            BeginRead();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error connecting to server: {e.Message}");
+        }
+    }
+
+    private void BeginRead()
+    {
+        if (stream != null)
+        {
+            stream.BeginRead(buffer, 0, buffer.Length, OnDataReceived, null);
+        }
+    }
+
+    private void OnDataReceived(IAsyncResult ar)
+    {
+        try
+        {
+            int bytesRead = stream.EndRead(ar);
+            if (bytesRead > 0)
+            {
+                string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                Debug.Log($"Received data: {receivedData}");
+                // Continue reading data
+                BeginRead();
+            }
+            else
+            {
+                Debug.Log("Connection closed by server.");
+                CloseConnection();
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error receiving data: {e.Message}");
+            CloseConnection();
+        }
+    }
+
+    public void ExeSend(byte[] buffer)
+    {
+        if (tcpClient != null && tcpClient.Connected)
+        {
+            stream.Write(buffer, 0, buffer.Length);
+        }
+    }
+
+    private void CloseConnection()
+    {
+        if (stream != null)
+        {
+            stream.Close();
+        }
+        if (tcpClient != null)
+        {
+            tcpClient.Close();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        CloseConnection();
+    }
+
+    #endregion
+
+    #region JS_PLUGIN
 
     [DllImport("__Internal")]
     private static extern void Connect(string url);
@@ -193,9 +293,9 @@ public class NetworkManager : MonoBehaviour
 
 //#if UNITY_WEBGL && !UNITY_EDITOR
 
-    void WebGLStart()
+    void WebGLStart(string address)
     {
-        Connect("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
+        Connect(address);
     }
 
     private void WebGLUpdate()
@@ -227,6 +327,7 @@ public class NetworkManager : MonoBehaviour
     static void ResolveNetObjInit(byte[] buffer)
     {
         ushort param_ID = GetBufferUShort(buffer, 3);
+        Debug.Log("NetObjInit param: " + param_ID);
         if (param_ID < 1024)
         {
             initializationLinker[param_ID].AssignObjID(GetBufferUShort(buffer, 5));
@@ -246,7 +347,6 @@ public class NetworkManager : MonoBehaviour
 
         if (buffer[1] == 0 && buffer[0] == 0)
         {
-            Debug.Log("received special message: " + msg);
             Debug.Log(buffer[3] == 0);
 
             if (buffer[2] == 0)
@@ -262,8 +362,10 @@ public class NetworkManager : MonoBehaviour
                 ResolveTime(buffer);
             }
         }
-
-        ProcessUpdate(buffer);
+        else
+        {
+            ProcessUpdate(buffer);
+        }        
     }
 
     public void ConnectSuccessful()
@@ -284,31 +386,58 @@ public class NetworkManager : MonoBehaviour
     float latency;
     float[] offsets = new float[7];
     int offsets_index;
-    float send_time;
+    float send_time, server_time;
+    bool overflow_correction = false;
 
     void ResolveTime(byte[] buffer)
     {
         latency = (time - send_time) / 2;
         Debug.Log("ping: " + latency);
-        offsets[offsets_index] = GetBufferUShort(buffer, 3) / 1000f + latency - time;
+        server_time = GetBufferUShort(buffer, 3) / 1000f + latency;
+        if (overflow_correction)
+        {
+            server_time = (server_time + 30) % 60;
+        }
+        else
+        {
+            if (server_time > 54 && offsets_index == 0)
+            {
+                overflow_correction = true;
+                PingTime();
+                return;
+            }
+        }
+        offsets[offsets_index] = server_time - time;
         offsets_index++;
 
         if (offsets_index >= offsets.Length)
         {
             Array.Sort(offsets);
-            Debug.Log("final difference: " + offsets[3]);
-            time += offsets[3];
+            Debug.Log("final difference: " + offsets[offsets.Length / 2]);
+            time += offsets[offsets.Length/2];
+            if (overflow_correction)
+            {
+                time -= 30;
+                if (time < 0) { time += 60; }
+            }
 
-            offsets = new float[7];
             offsets_index = 0;
+            overflow_correction = false;
+            Invoke("SyncTime", 20);
         }
         else
         {
-            SyncTime();
+            PingTime();
         }
     }
 
     void SyncTime()
+    {
+        time = 0;
+        PingTime();
+    }
+
+    void PingTime()
     {
         byte[] time_buffer = { 0, 0, 3 };
         send_time = time;

@@ -1066,6 +1066,7 @@ MonoBehaviour:
   cubeFlashInd: {fileID: 673881153}
   networkPrefabs:
   - {fileID: 7519088143345149968, guid: 044804a0d80a51c428987b8802dfe6aa, type: 3}
+  isWebGL: 0
 --- !u!1 &1683669497
 GameObject:
   m_ObjectHideFlags: 0
