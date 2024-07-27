@@ -4,16 +4,23 @@ using UnityEngine;
 
 public class NetworkObject : MonoBehaviour
 {
+    bool connected;
     public ushort objID;
     protected void Start()
     {
-        objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>());
+        
     }
 
-    // Update is called once per frame
-    void Update()
+    public bool IsConnected()
     {
-        
+        return connected;
+    }
+
+    public virtual void AssignObjID(ushort ID)
+    {
+        objID = ID;
+        NetworkManager.networkObjects.Add(ID, GetComponent<NetworkObject>());        
+        connected = true;
     }
 
     public virtual void NetworkUpdate(byte[] buffer)

@@ -12,27 +12,15 @@ public class NetworkManager : MonoBehaviour
     [SerializeField] GameObject cubeFlashInd;
 
     #region NETWORK_OBJECTS
-    static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
-    static PlayerController[] players;
+
+    public GameObject[] networkPrefabs;
+
+    public static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
+    public static PlayerController[] players;
 
     void ProcessUpdate(byte[] buffer)
     {
         networkObjects[GetBufferObjID(buffer)].NetworkUpdate(buffer);
-    }
-
-    public static ushort GetNewObjID(NetworkObject networkObject, bool permanent = false)
-    {
-        ushort newID = 0;
-        if (permanent)
-        {
-            newID = 0;
-        }
-        else
-        {
-            newID = 1024;
-        }
-        networkObjects.Add(newID, networkObject);
-        return newID;
     }
 
     public static ushort GetBufferObjID(byte[] buffer)
@@ -59,16 +47,31 @@ public class NetworkManager : MonoBehaviour
 
     const ushort HALF_SHORT = 32768;
 
+    public static bool isHost;
+
     private void Awake()
     {
         self = GetComponent<NetworkManager>();
         InitializeBufferSizes();
     }
 
-    int lastSecond;
-    private void FixedUpdate()
+    private void Start()
     {
-        tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        WebGLStart();
+#endif
+    }
+
+    int lastSecond;
+    private void Update()
+    {
+        //tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
+
+        #if UNITY_WEBGL && !UNITY_EDITOR
+        WebGLUpdate();
+        #endif
+
+        return;
         if (lastSecond != System.DateTime.Now.Second)
         {
             cubeFlashInd.SetActive(!cubeFlashInd.activeSelf);
@@ -153,7 +156,7 @@ public class NetworkManager : MonoBehaviour
 
 #endregion
 
-    #region JS_PLUGIN
+#region JS_PLUGIN
 
     [DllImport("__Internal")]
     private static extern void Connect(string url);
@@ -173,36 +176,91 @@ public class NetworkManager : MonoBehaviour
         return false;
     }
 
-#if UNITY_WEBGL && !UNITY_EDITOR
+//#if UNITY_WEBGL && !UNITY_EDITOR
 
-    void Start()
+    void WebGLStart()
     {
-        Connect("ws://192.168.1.212:3300");
+        Connect("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
     }
 
-    private void Update()
+    private void WebGLUpdate()
     {
 
     }
 
-    public static void SendLong(long msg)
+    static ushort tempID = 0;
+    static byte[] syncObjBuffer = { 0, 0, 2, 0, 0, 0, 0};
+    static Dictionary<ushort, NetworkObject> initializationLinker = new Dictionary<ushort, NetworkObject>();
+
+    static List<byte[]> initializationQue = new List<byte[]>();
+
+    public static void InitializeNetObj(NetworkObject netObj, ushort prefabID)
     {
-        Debug.Log("send long: " + msg);
-        //Send((int)(msg >> 32), (int)(msg & 0xFFFFFFFF));
+        SetBufferUShort(syncObjBuffer, prefabID, 3);
+        SetBufferUShort(syncObjBuffer, tempID, 5);
+        initializationLinker.Add(tempID, netObj);
+
+        Debug.Log("prefabID: " + prefabID + " qued with tempID: " + tempID);
+        tempID++;
+        if (tempID >= 1024) { tempID = 0; }
+
+        if (connected) { Send(syncObjBuffer); }
+        else { initializationQue.Add(syncObjBuffer); }
+    }
+
+    static NetworkObject newNetObj;
+    static void ResolveNetObjInit(byte[] buffer)
+    {
+        Debug.Log("begin resolve");
+        ushort param_ID = GetBufferUShort(buffer, 3);
+        Debug.Log("handling paramID: " + param_ID);
+        if (param_ID < 1024)
+        {
+            Debug.Log("tempID: " + param_ID + " received ID: " + GetBufferUShort(buffer, 5));
+            initializationLinker[param_ID].AssignObjID(GetBufferUShort(buffer, 5));
+            initializationLinker.Remove(param_ID);
+        }
+        else
+        {
+            Debug.Log("client received sync request: " + param_ID);
+            newNetObj = Instantiate(self.networkPrefabs[param_ID - 1024]).GetComponent<NetworkObject>();
+            Debug.Log("instantiated: " + self.networkPrefabs[param_ID - 1024]);
+            newNetObj.AssignObjID(GetBufferUShort(buffer, 5));
+        }
     }
 
     public void JSM(string msg)
     {
         byte[] buffer = System.Convert.FromBase64String(msg);
         //self.tmp.text = FormatString(buffer);
+
+        if (buffer[1] == 0 && buffer[0] == 0)
+        {
+            Debug.Log("received special message: " + msg);
+            Debug.Log(buffer[3] == 0);
+            if (buffer[2] == 0) { isHost = buffer[3] == 1; }
+            else if (buffer[2] == 1)
+            {
+                ResolveNetObjInit(buffer);
+            }
+        }
+
         ProcessUpdate(buffer);
     }
 
     public void ConnectSuccessful()
     {
         connected = true;
+
+        byte[] initial_message = { 0, 0, 0 };
+        Send(initial_message);
+
+        for (int i = 0; i < initializationQue.Count; i++)
+        {
+            Send(initializationQue[i]);
+        }
     }
-#endif
+//#endif
 }
 
 #endregion

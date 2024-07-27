@@ -25,19 +25,29 @@ public class PlayerController : NetworkObject
 
     private void Awake()
     {
-        PlayerController.self = GetComponent<PlayerController>();
+        self = GetComponent<PlayerController>();
     }
 
     new void Start()
     {
-        objID = NetworkManager.GetNewObjID(GetComponent<NetworkObject>(), true);
-        playerObjID = objID;
-        hpScript.objID = objID;
+        if (isLocal)
+        {
+            NetworkManager.InitializeNetObj(self, 0);
+        }        
 
         PlayerObj.parent = null;
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
+    }
+
+    public override void AssignObjID(ushort ID)
+    {
+        base.AssignObjID(ID);
+        playerObjID = ID;
+        hpScript.objID = ID;
+
+        Debug.Log("player received ID: " + ID);
     }
 
     float updateTimeout;
@@ -82,8 +92,11 @@ public class PlayerController : NetworkObject
 
     void SendNetworkUpdate()
     {
-        NetworkManager.UpdatePlayerInput(transform.position, keyFwd, keyBack, keyLeft, keyRight);
-        updateTimeout = 0.2f;
+        if (IsConnected())
+        {
+            NetworkManager.UpdatePlayerInput(transform.position, keyFwd, keyBack, keyLeft, keyRight);
+            updateTimeout = 0.2f;
+        }        
     }
 
     public override void NetworkUpdate(byte[] buffer)
@@ -231,7 +244,7 @@ public class PlayerController : NetworkObject
         camTrfm.Rotate(Vector3.right * yMouse);
         PlayerObj.Rotate(Vector3.up * xMouse);     
         
-        if (Mathf.Abs(xMouse) > 1f && updateTimeout < 0.05f)
+        if (Mathf.Abs(xMouse) > 0.4f && updateTimeout < 0.15f)
         {
             SendNetworkUpdate();
         }
