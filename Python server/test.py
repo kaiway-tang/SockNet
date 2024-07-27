@@ -10,9 +10,7 @@ connected_clients = set()
 host_connected = False
 id_deque = deque()
 id_end = 1
-
 id_message = bytearray([0, 0, 1, 0, 0, 0, 0])
-time_message = bytearray([0, 0, 3, 0, 0])
 
 sync_package = []
 
@@ -25,9 +23,6 @@ def GetID():
 
 def ReturnID(id):
     id_deque.append(id)
-
-def GetTime():
-    return struct.pack('>H', round(time.time() * 1000) % 60000)
 
 async def HandleServerRequest(message, websocket):
     global id_end
@@ -60,10 +55,6 @@ async def HandleServerRequest(message, websocket):
                 await client.send(id_message)
 
         sync_package.append(id_message)
-    
-    elif message[2] == 3:
-        time_message[3:5] = GetTime()
-        await websocket.send(time_message)
 
 
 async def handle_client(websocket, path):
@@ -98,4 +89,8 @@ async def main():
 
 if __name__ == "__main__":
     print("Going!")
-    asyncio.run(main())
+    while True:
+        print(round(time.time() * 1000) % 60000)
+        time.sleep(1)
+
+    # asyncio.run(main())

@@ -18,6 +18,8 @@ public class NetworkManager : MonoBehaviour
     public static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
     public static PlayerController[] players;
 
+    public static float time;
+
     void ProcessUpdate(byte[] buffer)
     {
         networkObjects[GetBufferObjID(buffer)].NetworkUpdate(buffer);
@@ -67,9 +69,12 @@ public class NetworkManager : MonoBehaviour
     {
         //tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
 
-        #if UNITY_WEBGL && !UNITY_EDITOR
+#if UNITY_WEBGL && !UNITY_EDITOR
         WebGLUpdate();
-        #endif
+#endif
+
+        time += Time.deltaTime;
+        if (time > 60) { time -= 60; }
 
         return;
         if (lastSecond != System.DateTime.Now.Second)
@@ -81,7 +86,7 @@ public class NetworkManager : MonoBehaviour
 
     void InitializeBufferSizes()
     {
-        playerInputBuffer = new byte[11];
+        playerInputBuffer = new byte[13];
     }
   
     static int temp;
@@ -95,16 +100,18 @@ public class NetworkManager : MonoBehaviour
     {
         SetBufferUShort(playerInputBuffer, PlayerController.playerObjID);
 
+        SetBufferTime(playerInputBuffer, 2);
+
         SetBufferCoords(playerInputBuffer, pos);
 
-        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 8);
+        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 10);
 
         temp = fwd ? 8 : 0;
         temp += back ? 4 : 0;
         temp += left ? 2 : 0;
         temp += right ? 1 : 0;
 
-        playerInputBuffer[10] = (byte)temp;
+        playerInputBuffer[12] = (byte)temp;
 
         //Debug.Log(FormatString(playerInputBuffer));
         //self.tmp.text = FormatString(playerInputBuffer);
@@ -112,7 +119,7 @@ public class NetworkManager : MonoBehaviour
         Send(playerInputBuffer);
     }
 
-    static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 2)
+    static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 4)
     {
         SetBufferUShort(buffer, EncodeValue(pos.x), 2);
         SetBufferUShort(buffer, EncodeValue(pos.y), 4);
@@ -132,7 +139,10 @@ public class NetworkManager : MonoBehaviour
         buffer[startIndex + 1] = (byte)(val & 0xFF);
     }
 
-
+    public static void SetBufferTime(byte[] buffer, int startIndex = 0)
+    {
+        SetBufferUShort(buffer, (ushort)Mathf.RoundToInt(time * 1000), startIndex);
+    }
 
     static Vector3 tempVect;
     public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 2)
@@ -152,6 +162,11 @@ public class NetworkManager : MonoBehaviour
     public static ushort GetBufferUShort(byte[] buffer, int startIndex = 0)
     {
         return (ushort)(buffer[startIndex] << 8 | buffer[startIndex + 1]);
+    }
+
+    public static float GetBufferDelay(byte[] buffer, int startIndex = 0)
+    {
+        return Mathf.RoundToInt(time * 1000) - GetBufferUShort(buffer, startIndex);
     }
 
 #endregion
@@ -238,10 +253,22 @@ public class NetworkManager : MonoBehaviour
         {
             Debug.Log("received special message: " + msg);
             Debug.Log(buffer[3] == 0);
-            if (buffer[2] == 0) { isHost = buffer[3] == 1; }
+
+            if (buffer[2] == 0)
+            {
+                isHost = buffer[3] == 1;
+            }
             else if (buffer[2] == 1)
             {
                 ResolveNetObjInit(buffer);
+            }
+            else if (buffer[2] == 3)
+            {
+                latency = (time - send_time) / 2;
+                latencies.Enqueue(latency);
+                if (latency > max_lat) { max_lat = latency; }
+                if (latency < min_lat) { min_lat = latency; }
+                SyncTime();
             }
         }
 
@@ -259,6 +286,32 @@ public class NetworkManager : MonoBehaviour
         {
             Send(initializationQue[i]);
         }
+
+        Invoke("SyncTime", 0.5f);
+    }
+
+    float latency;
+    float min_lat = 9999, max_lat = 0;
+    float min_range = 9999;
+    Queue<float> latencies;
+    float send_time;
+    float running_difference;
+
+    void SyncTime()
+    {
+        if (latencies.Count > 2)
+        {
+            if (max_lat - min_lat < min_range)
+            {
+                min_range = send_time;
+                running_difference = 
+            }
+            latencies.Dequeue();
+        }
+
+        byte[] time_buffer = { 0, 0, 3 };
+        send_time = time;
+        Send(time_buffer);
     }
 //#endif
 }
