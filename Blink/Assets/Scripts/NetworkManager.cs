@@ -71,12 +71,14 @@ public class NetworkManager : MonoBehaviour
     {        
         if (isWebGL)
         {
-            WebGLStart("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
+            WebGL_Start("ws://" + ENV.DEFAULT_IP + ":" + ENV.DEFAULT_PORT);
         }
         else
         {
-            ExeConnect(ENV.SPVCB8L_IP, ENV.DEFAULT_PORT_INT);
+            ExeConnect(ENV.DEFAULT_IP, ENV.DEFAULT_PORT_INT);
         }
+
+        nextSync = 1;
     }
 
     int lastSecond;
@@ -85,9 +87,15 @@ public class NetworkManager : MonoBehaviour
         //tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
 
 
-        if (isWebGL) { WebGLUpdate(); }        
+        if (isWebGL) { WebGL_Update(); }
+        SyncTime_Update();
 
         time += Time.deltaTime;
+        if (connected && time > nextSync)
+        {
+            nextSync = (nextSync + 5) % 60;
+            SyncTime();
+        }
         if (time > 60) { time -= 60; }
 
         if (lastSecond != Mathf.RoundToInt(time))
@@ -99,7 +107,7 @@ public class NetworkManager : MonoBehaviour
 
     void InitializeBufferSizes()
     {
-        playerInputBuffer = new byte[13];
+        playerInputBuffer = new byte[16];
     }
   
     static int temp;
@@ -113,18 +121,19 @@ public class NetworkManager : MonoBehaviour
     {
         SetBufferUShort(playerInputBuffer, PlayerController.playerObjID);
 
-        SetBufferTime(playerInputBuffer, 2);
+        SetBufferTime(playerInputBuffer, 3);
 
         SetBufferCoords(playerInputBuffer, pos);
 
-        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 10);
+        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 11);
+        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.x), 13);
 
         temp = fwd ? 8 : 0;
         temp += back ? 4 : 0;
         temp += left ? 2 : 0;
         temp += right ? 1 : 0;
 
-        playerInputBuffer[12] = (byte)temp;
+        playerInputBuffer[15] = (byte)temp;
 
         //Debug.Log(FormatString(playerInputBuffer));
         //self.tmp.text = FormatString(playerInputBuffer);
@@ -132,7 +141,7 @@ public class NetworkManager : MonoBehaviour
         Send(playerInputBuffer);
     }
 
-    static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 4)
+    static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 5)
     {
         SetBufferUShort(buffer, EncodeValue(pos.x), 2);
         SetBufferUShort(buffer, EncodeValue(pos.y), 4);
@@ -158,7 +167,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     static Vector3 tempVect;
-    public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 4)
+    public static Vector3 GetBufferCoords(byte[] buffer, int startIndex = 5)
     {
         tempVect.x = DecodeValue(GetBufferUShort(buffer, startIndex));
         tempVect.y = DecodeValue(GetBufferUShort(buffer, startIndex + 2));
@@ -293,12 +302,12 @@ public class NetworkManager : MonoBehaviour
 
 //#if UNITY_WEBGL && !UNITY_EDITOR
 
-    void WebGLStart(string address)
+    void WebGL_Start(string address)
     {
         Connect(address);
     }
 
-    private void WebGLUpdate()
+    private void WebGL_Update()
     {
 
     }
@@ -380,14 +389,34 @@ public class NetworkManager : MonoBehaviour
             Send(initializationQue[i]);
         }
 
-        Invoke("SyncTime", 0.5f);
+        time = 0.5f;
     }
+    //#endif
+
+    #endregion
+
+    #region SYNC_TIME
 
     float latency;
     float[] offsets = new float[7];
     int offsets_index;
     float send_time, server_time;
     bool overflow_correction = false;
+
+    float nextSync = 1;
+    float pingTimer;
+
+    void SyncTime_Update()
+    {
+        if (pingTimer > 0)
+        {
+            pingTimer -= Time.deltaTime;
+            if (pingTimer <= 0)
+            {
+                PingTime();
+            }
+        }
+    }
 
     void ResolveTime(byte[] buffer)
     {
@@ -423,11 +452,10 @@ public class NetworkManager : MonoBehaviour
 
             offsets_index = 0;
             overflow_correction = false;
-            Invoke("SyncTime", 20);
         }
         else
         {
-            PingTime();
+            pingTimer = 0.25f;
         }
     }
 
@@ -443,7 +471,6 @@ public class NetworkManager : MonoBehaviour
         send_time = time;
         Send(time_buffer);
     }
-//#endif
-}
 
-#endregion
+    #endregion
+}

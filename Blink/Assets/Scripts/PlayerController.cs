@@ -103,13 +103,26 @@ public class PlayerController : NetworkObject
     {
         if (isLocal) return;
 
-        transform.position = NetworkManager.GetBufferCoords(buffer);
-        targetYRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 10));        
+        if (buffer[2] == 0)
+        {
+            HandleTrfmUpdate(buffer);
+        }
+        else
+        {
 
-        keyFwd = ((buffer[12] >> 3) & 0x01) == 1;
-        keyBack = ((buffer[12] >> 2) & 0x01) == 1;
-        keyLeft = ((buffer[12] >> 1) & 0x01) == 1;
-        keyRight = (buffer[12] & 0x01) == 1;
+        }
+    }
+
+    void HandleTrfmUpdate(byte[] buffer)
+    {
+        transform.position = NetworkManager.GetBufferCoords(buffer);
+        targetYRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 11));
+        //targetXRot = NetworkManager.DecodeValue(NetworkManager.GetBufferUShort(buffer, 13));
+
+        keyFwd = ((buffer[15] >> 3) & 0x01) == 1;
+        keyBack = ((buffer[15] >> 2) & 0x01) == 1;
+        keyLeft = ((buffer[15] >> 1) & 0x01) == 1;
+        keyRight = (buffer[15] & 0x01) == 1;
 
         Update();
 
