@@ -10,31 +10,6 @@ mergeInto(LibraryManager.library, {
     Bounce: function() {
         SendMessage('JSH', 'JSM', 'asdf');
     },
-    
-    AllInOne: function () {
-        // const socket = new WebSocket('ws://192.168.1.212:3300');
-
-        // socket.addEventListener('open', (event) => {
-        //     console.log('Connected to the server');
-        //     const message = 'Hello, Server!';
-        //     socket.send(message);
-        //     console.log(`Sent: ${message}`);
-        // });
-
-        // socket.addEventListener('message', (event) => {
-        //     console.log(`Message from server: ${event.data}`);
-            
-        //     SendMessage('JSH', 'JSM', event.data);
-        // });
-
-        // socket.addEventListener('close', (event) => {
-        //     console.log('Disconnected from the server');
-        // });
-
-        // socket.addEventListener('error', (event) => {
-        //     console.error('WebSocket error:', event);
-        // });  
-    },
 
     Connect: function (url) {
         window.webSocket = new WebSocket(UTF8ToString(url));

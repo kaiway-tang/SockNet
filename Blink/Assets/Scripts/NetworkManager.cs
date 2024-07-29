@@ -3,8 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
-using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 using TMPro;
 
@@ -28,7 +30,10 @@ public class NetworkManager : MonoBehaviour
 
     void ProcessUpdate(byte[] buffer)
     {
-        networkObjects[GetBufferObjID(buffer)].NetworkUpdate(buffer);
+        ushort objID = GetBufferObjID(buffer);
+        if (networkObjects.ContainsKey(objID)){
+            networkObjects[objID].NetworkUpdate(buffer);
+        }
     }
 
     public static ushort GetBufferObjID(byte[] buffer)
@@ -43,9 +48,9 @@ public class NetworkManager : MonoBehaviour
         output += ", Coords: ";
         output += GetBufferCoords(buffer);
         output += ", YRot: ";
-        output += DecodeValue(GetBufferUShort(buffer, 8));
+        output += DecodeValue(GetBufferUShort(buffer, 11));
         output += ", Inputs: ";
-        output += buffer[10];
+        output += buffer[15];
 
         return output;
     }
@@ -71,11 +76,11 @@ public class NetworkManager : MonoBehaviour
     {        
         if (isWebGL)
         {
-            WebGL_Start("ws://" + ENV.DEFAULT_IP + ":" + ENV.DEFAULT_PORT);
+            WebGL_Start("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
         }
         else
         {
-            ExeConnect(ENV.DEFAULT_IP, ENV.DEFAULT_PORT_INT);
+            Exe_Start("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
         }
 
         nextSync = 1;
@@ -91,9 +96,11 @@ public class NetworkManager : MonoBehaviour
         SyncTime_Update();
 
         time += Time.deltaTime;
-        if (connected && time > nextSync)
+        if (timeSynced && time > nextSync && time - nextSync < 50)
         {
-            nextSync = (nextSync + 5) % 60;
+            nextSync = (nextSync + 10) % 60;
+            offsets[0] = offsets[offsets.Length / 2];
+            offsets_index = 1;
             SyncTime();
         }
         if (time > 60) { time -= 60; }
@@ -107,55 +114,33 @@ public class NetworkManager : MonoBehaviour
 
     void InitializeBufferSizes()
     {
-        playerInputBuffer = new byte[16];
+        
     }
   
     static int temp;
 
-    // X - Y - Z - YRot - inputs
-    // 2'b - 2'b - 2'b - 2'b - 1'b
-    static byte[] playerInputBuffer;
-    const int PLAYER_INPUT = 1;
-
-    public static void UpdatePlayerInput(Vector3 pos, bool fwd, bool back, bool left, bool right)
+    public static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 5)
     {
-        SetBufferUShort(playerInputBuffer, PlayerController.playerObjID);
-
-        SetBufferTime(playerInputBuffer, 3);
-
-        SetBufferCoords(playerInputBuffer, pos);
-
-        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.y), 11);
-        SetBufferUShort(playerInputBuffer, EncodeValue(PlayerController.self.PlayerObj.eulerAngles.x), 13);
-
-        temp = fwd ? 8 : 0;
-        temp += back ? 4 : 0;
-        temp += left ? 2 : 0;
-        temp += right ? 1 : 0;
-
-        playerInputBuffer[15] = (byte)temp;
-
-        //Debug.Log(FormatString(playerInputBuffer));
-        //self.tmp.text = FormatString(playerInputBuffer);
-
-        Send(playerInputBuffer);
+        SetBufferUShort(buffer, EncodeValue(pos.x), startIndex);
+        SetBufferUShort(buffer, EncodeValue(pos.y), startIndex + 2);
+        SetBufferUShort(buffer, EncodeValue(pos.z), startIndex + 4);
     }
 
-    static void SetBufferCoords(byte[] buffer, Vector3 pos, int startIndex = 5)
+    public static ushort EncodePosValue(float val, int leftShift = 100)
     {
-        SetBufferUShort(buffer, EncodeValue(pos.x), 2);
-        SetBufferUShort(buffer, EncodeValue(pos.y), 4);
-        SetBufferUShort(buffer, EncodeValue(pos.z), 6);
+        temp = Mathf.RoundToInt(val * leftShift);
+        if (temp > 65535 || temp < 0) { temp = 0; }
+        return (ushort)temp;
     }
 
-    static ushort EncodeValue(float val, int leftShift = 100)
+    public static ushort EncodeValue(float val, int leftShift = 100)
     {
-        temp = (Mathf.RoundToInt(val * leftShift) + HALF_SHORT);
+        temp = Mathf.RoundToInt(val * leftShift) + HALF_SHORT;
         if (temp > 65535 || temp < 0) { temp = HALF_SHORT; }
         return (ushort)temp;
     }
 
-    static void SetBufferUShort(byte[] buffer, ushort val, int startIndex = 0)
+    public static void SetBufferUShort(byte[] buffer, ushort val, int startIndex = 0)
     {
         buffer[startIndex] = (byte)(val >> 8);
         buffer[startIndex + 1] = (byte)(val & 0xFF);
@@ -176,6 +161,11 @@ public class NetworkManager : MonoBehaviour
         return tempVect;
     }
 
+    public static float DecodePosValue(ushort val, int leftShift = 100)
+    {
+        return (float)val / leftShift;
+    }
+
     public static float DecodeValue(ushort val, int leftShift = 100)
     {
         return (float)(val - HALF_SHORT) / leftShift;
@@ -186,96 +176,137 @@ public class NetworkManager : MonoBehaviour
         return (ushort)(buffer[startIndex] << 8 | buffer[startIndex + 1]);
     }
 
-    public static float GetBufferDelay(byte[] buffer, int startIndex = 0)
+    public static float GetBufferDelta(byte[] buffer, int startIndex = 0)
     {
-        return Mathf.RoundToInt(time * 1000) - GetBufferUShort(buffer, startIndex);
+        return time - GetBufferUShort(buffer, startIndex)/1000f;
+    }
+
+    void ResolveServerMessage(byte[] buffer)
+    {
+        if (buffer[2] == 0)
+        {
+            isHost = buffer[3] == 1;
+        }
+        else if (buffer[2] == 1)
+        {
+            ResolveNetObjInit(buffer);
+        }
+        else if (buffer[2] == 3)
+        {
+            ResolveTime(buffer);
+        }
     }
 
     #endregion
 
     #region SOCKETS
 
-    private TcpClient tcpClient;
-    private NetworkStream stream;
-    private byte[] buffer = new byte[1024];
+    private static ClientWebSocket webSocket = null;
+    private static CancellationTokenSource cancellation = new CancellationTokenSource();
 
-    private void ExeConnect(string address, int port)
+    async void Exe_Start(string url)
     {
+        await Connect(new Uri(url));
+    }
+
+    private async Task Connect(Uri uri)
+    {
+        webSocket = new ClientWebSocket();
+        await webSocket.ConnectAsync(uri, cancellation.Token);
+        Debug.Log("WebSocket connection established!");
+
+        // Start listening for incoming messages
+        connected = true;
+        byte[] initialMessage = { 0, 0, 0 };
+        await ExeSend(initialMessage);
+        SyncTime();
+        for (int i = 0; i < initializationQue.Count; i++)
+        {
+            Send(initializationQue[i]);
+        }
+        await Receive();
+
+        return;
+
         try
         {
-            tcpClient = new TcpClient(address, port);
-            stream = tcpClient.GetStream();
-            Debug.Log("Connected to server.");
+            await webSocket.ConnectAsync(uri, cancellation.Token);
+            Debug.Log("WebSocket connection established!");
+
+            // Start listening for incoming messages
             connected = true;
-
-            byte[] initial_message = { 0, 0, 0 };
-            ExeSend(initial_message);
-
-            // Start listening for incoming data
-            BeginRead();
+            //byte[] initialMessage = { 0, 0, 0 };            
+            await ExeSend(initialMessage);
+            SyncTime();
+            for (int i = 0; i < initializationQue.Count; i++)
+            {
+                Send(initializationQue[i]);
+            }
+            await Receive();            
         }
         catch (Exception e)
         {
-            Debug.LogError($"Error connecting to server: {e.Message}");
+            Debug.LogError("WebSocket connection error: " + e.Message);
         }
     }
 
-    private void BeginRead()
+    private async Task Receive()
     {
-        if (stream != null)
+        var buffer = new byte[16];
+        while (webSocket.State == WebSocketState.Open)
         {
-            stream.BeginRead(buffer, 0, buffer.Length, OnDataReceived, null);
-        }
-    }
-
-    private void OnDataReceived(IAsyncResult ar)
-    {
-        try
-        {
-            int bytesRead = stream.EndRead(ar);
-            if (bytesRead > 0)
+            WebSocketReceiveResult result = null;
+            try
             {
-                string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                Debug.Log($"Received data: {receivedData}");
-                // Continue reading data
-                BeginRead();
+                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellation.Token);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("WebSocket receive error: " + e.Message);
+                break;
+            }
+
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                Debug.Log("WebSocket connection closed.");
+                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, cancellation.Token);
             }
             else
             {
-                Debug.Log("Connection closed by server.");
-                CloseConnection();
+                //var receivedData = ConvertArraySegmentToByteArray(new ArraySegment<byte>(buffer, 0, result.Count));
+
+                if (buffer[1] == 0 && buffer[0] == 0)
+                {
+                    ResolveServerMessage(buffer);
+                }
+                else
+                {
+                    ProcessUpdate(buffer);
+                }
             }
         }
-        catch (Exception e)
+    }
+
+    public static async Task ExeSend(byte[] buffer)
+    {
+        if (webSocket != null && webSocket.State == WebSocketState.Open)
         {
-            Debug.LogError($"Error receiving data: {e.Message}");
-            CloseConnection();
+            //var encodedMessage = Encoding.UTF8.GetBytes(message);
+            var arraySegment = new ArraySegment<byte>(buffer, 0, buffer.Length);
+            await webSocket.SendAsync(arraySegment, WebSocketMessageType.Binary, true, cancellation.Token);
+        }
+        else
+        {
+            Debug.LogWarning("WebSocket is not connected.");
         }
     }
 
-    public void ExeSend(byte[] buffer)
+    private async void OnApplicationQuit()
     {
-        if (tcpClient != null && tcpClient.Connected)
+        if (webSocket != null)
         {
-            stream.Write(buffer, 0, buffer.Length);
+            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Application ending", CancellationToken.None);
         }
-    }
-
-    private void CloseConnection()
-    {
-        if (stream != null)
-        {
-            stream.Close();
-        }
-        if (tcpClient != null)
-        {
-            tcpClient.Close();
-        }
-    }
-
-    private void OnDestroy()
-    {
-        CloseConnection();
     }
 
     #endregion
@@ -289,15 +320,21 @@ public class NetworkManager : MonoBehaviour
     private static extern void JSSend(byte[] buffer, int length);    
 
     static bool connected;
+    static bool timeSynced = false;
 
-    public static bool Send(byte[] buffer)
+    public static async void Send(byte[] buffer)
     {
         if (connected)
         {
-            JSSend(buffer, buffer.Length);
-            return true;
+            if (self.isWebGL)
+            {
+                JSSend(buffer, buffer.Length);
+            }
+            else
+            {
+                await ExeSend(buffer);
+            }            
         }
-        return false;
     }
 
 //#if UNITY_WEBGL && !UNITY_EDITOR
@@ -351,25 +388,12 @@ public class NetworkManager : MonoBehaviour
 
     public void JSM(string msg)
     {
-        byte[] buffer = System.Convert.FromBase64String(msg);
+        byte[] buffer = Convert.FromBase64String(msg);
         //self.tmp.text = FormatString(buffer);
 
         if (buffer[1] == 0 && buffer[0] == 0)
         {
-            Debug.Log(buffer[3] == 0);
-
-            if (buffer[2] == 0)
-            {
-                isHost = buffer[3] == 1;
-            }
-            else if (buffer[2] == 1)
-            {
-                ResolveNetObjInit(buffer);
-            }
-            else if (buffer[2] == 3)
-            {
-                ResolveTime(buffer);
-            }
+            ResolveServerMessage(buffer);
         }
         else
         {
@@ -389,7 +413,7 @@ public class NetworkManager : MonoBehaviour
             Send(initializationQue[i]);
         }
 
-        time = 0.5f;
+        SyncTime();
     }
     //#endif
 
@@ -421,7 +445,6 @@ public class NetworkManager : MonoBehaviour
     void ResolveTime(byte[] buffer)
     {
         latency = (time - send_time) / 2;
-        Debug.Log("ping: " + latency);
         server_time = GetBufferUShort(buffer, 3) / 1000f + latency;
         if (overflow_correction)
         {
@@ -429,7 +452,7 @@ public class NetworkManager : MonoBehaviour
         }
         else
         {
-            if (server_time > 54 && offsets_index == 0)
+            if (server_time > 52 && offsets_index == 0)
             {
                 overflow_correction = true;
                 PingTime();
@@ -442,7 +465,7 @@ public class NetworkManager : MonoBehaviour
         if (offsets_index >= offsets.Length)
         {
             Array.Sort(offsets);
-            Debug.Log("final difference: " + offsets[offsets.Length / 2]);
+            //Debug.Log("final difference: " + offsets[offsets.Length / 2]);
             time += offsets[offsets.Length/2];
             if (overflow_correction)
             {
@@ -452,16 +475,22 @@ public class NetworkManager : MonoBehaviour
 
             offsets_index = 0;
             overflow_correction = false;
+
+            if (!timeSynced)
+            {
+                timeSynced = true;
+                nextSync = (time - time % 5 + 6) % 60;
+            }            
         }
         else
         {
             pingTimer = 0.25f;
+            //PingTime();
         }
     }
 
     void SyncTime()
     {
-        time = 0;
         PingTime();
     }
 

@@ -7,12 +7,10 @@ public class Shuriken : Projectile
     [SerializeField] ParticleSystem trail;
     [SerializeField] float speed;
 
-    Transform trfm;
-    new void Start()
+    public override void Init(ushort ownerID, float timeDelta)
     {
-        Invoke("End", 5);
-        trfm = transform;
-        //base.Start();
+        base.Init(ownerID, timeDelta);
+        trfm.position += trfm.forward * speed * timeDelta;        
     }
 
     // Update is called once per frame
@@ -21,17 +19,28 @@ public class Shuriken : Projectile
         trfm.position += trfm.forward * speed * Time.deltaTime;
     }
 
+    HPEntity target;
     private void OnTriggerEnter(Collider other)
     {
         if (other.gameObject.layer == 6 || other.gameObject.layer == 8)
         {
-            if (other.gameObject.layer == 6 && other.GetComponent<HPEntity>().objID == ownerID) { return; }
-            Debug.Log("hit: " + other.gameObject.name);
+            if (other.gameObject.layer == 6)
+            {
+                target = other.GetComponent<HPEntity>();
+                if (target.objID != ownerID)
+                {
+                    target.TakeDamage(damage, ownerID);
+                }
+                else
+                {
+                    return;
+                }
+            }
             End();
         }
     }
 
-    void End()
+    protected override void End()
     {
         trail.Stop();
         trail.transform.parent = null;

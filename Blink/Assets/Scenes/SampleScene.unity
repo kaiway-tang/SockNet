@@ -450,7 +450,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 17.4, y: -162}
-  m_SizeDelta: {x: 600, y: 50}
+  m_SizeDelta: {x: 900, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &517391241
 MonoBehaviour:
@@ -951,8 +951,8 @@ GameObject:
   - component: {fileID: 1587210652}
   - component: {fileID: 1587210651}
   - component: {fileID: 1587210650}
-  - component: {fileID: 1587210654}
   - component: {fileID: 1587210655}
+  - component: {fileID: 1587210656}
   m_Layer: 0
   m_Name: NM
   m_TagString: Untagged
@@ -1036,20 +1036,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 1
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1587210654
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1587210648}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4be960b14f4ca7f4385f6ce7dfddf4db, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &1587210655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1067,6 +1055,19 @@ MonoBehaviour:
   networkPrefabs:
   - {fileID: 7519088143345149968, guid: 044804a0d80a51c428987b8802dfe6aa, type: 3}
   isWebGL: 0
+--- !u!114 &1587210656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1587210648}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0477ee2d9e50a5441919c624734ae53d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  objID: 0
 --- !u!1 &1683669497
 GameObject:
   m_ObjectHideFlags: 0
@@ -1194,7 +1195,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   objID: 0
-  packet: 0a000000
+  targetXRot: 0
+  targetYRot: 0
+  xRot: 0
+  yRot: 0
 --- !u!4 &1890599834
 Transform:
   m_ObjectHideFlags: 0
@@ -1363,7 +1367,7 @@ PrefabInstance:
       objectReference: {fileID: 1955671701}
     - target: {fileID: 4542395017445493057, guid: 292008752f198aa41a239bdff69ca252, type: 3}
       propertyPath: m_RootOrder
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4542395017445493057, guid: 292008752f198aa41a239bdff69ca252, type: 3}
       propertyPath: m_LocalPosition.x

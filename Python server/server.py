@@ -35,12 +35,12 @@ async def HandleServerRequest(message, websocket):
     if message[2] == 0:
         print("new kid")
         await websocket.send(bytearray([0, 0, 0, 0 if host_connected else 1]))
-        # for buffer in sync_package:
-        #     await websocket.send(buffer)
+        for buffer in sync_package:
+            await websocket.send(buffer)
     
     elif message[2] == 1:
         print("host update")
-        id_end = struct.unpack('H', message[3:5])[0]
+        id_end = struct.unpack('>H', message[3:5])[0]
     
     elif message[2] == 2:
         new_id = GetID()
@@ -50,7 +50,7 @@ async def HandleServerRequest(message, websocket):
         id_message[5:7] = struct.pack('>H', new_id)
         await websocket.send(id_message)
 
-        prefab_ID = struct.unpack('H', message[3:5])[0]
+        prefab_ID = struct.unpack('>H', message[3:5])[0]
         prefab_ID += 1024
         id_message[3:5] = struct.pack('>H', prefab_ID)
 
@@ -63,9 +63,27 @@ async def HandleServerRequest(message, websocket):
     elif message[2] == 3:
         time_message[3:5] = GetTime()
         await websocket.send(time_message)
+    
+    elif message[2] == 4:
+        new_id = GetID()        
+
+        id_message[3:5] = message[5:7]
+        id_message[5:7] = struct.pack('>H', new_id)
+        # await websocket.send(id_message)
+
+        prefab_ID = struct.unpack('>H', message[3:5])[0]
+        prefab_ID += 1024
+        id_message[3:5] = struct.pack('>H', prefab_ID)
+
+        print("assigned ID: ", new_id, " for new prefab ID: ", prefab_ID)
+
+        for client in connected_clients:
+            await client.send(id_message)
+
+        sync_package.append(id_message)
 
 
-async def handle_client(websocket, path):
+async def handle_client(websocket):
     # Add the new client to our set
     connected_clients.add(websocket)
     try:
