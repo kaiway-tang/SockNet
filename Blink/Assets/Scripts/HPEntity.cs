@@ -14,6 +14,7 @@ public class HPEntity : MonoBehaviour
 
     public bool useDefaultBehavior = true;
 
+    [SerializeField] bool dontSync;
     [SerializeField] GameObject rootObj;
     ushort lastHPUpdate;
 
@@ -57,15 +58,15 @@ public class HPEntity : MonoBehaviour
     byte[] HPBuffer;
     public void SyncHP()
     {
-        NetworkManager.SetBufferUShort(HPBuffer, (ushort)HP, 3);
-        Debug.Log("HP sent: " + HPBuffer[0] + " " + HPBuffer[1] + " " + HPBuffer[2] + " " + HPBuffer[3] + " " + HPBuffer[4]);
+        if (dontSync) { return; }
+        if (HP < 0) { HP = 0; NetworkManager.SetBufferUShort(HPBuffer, 0, 3); }
+        else { NetworkManager.SetBufferUShort(HPBuffer, (ushort)HP, 3); }
         NetworkManager.Send(HPBuffer);
     }
 
     ushort hpUpdate;
     public void ResolveHP(byte[] buffer)
     {
-        Debug.Log("HP recv: " + buffer[0] + " " + buffer[1] + " " + buffer[2] + " " + buffer[3] + " " + buffer[4]);
         hpUpdate = NetworkManager.GetBufferUShort(buffer, 3);
         if (hpUpdate < HP)
         {

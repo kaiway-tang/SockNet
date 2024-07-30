@@ -181,19 +181,24 @@ public class NetworkManager : MonoBehaviour
         return time - GetBufferUShort(buffer, startIndex)/1000f;
     }
 
+    const int INIT_MSG = 0, NET_OBJ_INIT = 1, SYNC_TIME_MSG = 3, CLIENT_DCD = 4;
     void ResolveServerMessage(byte[] buffer)
     {
-        if (buffer[2] == 0)
+        if (buffer[2] == INIT_MSG)
         {
             isHost = buffer[3] == 1;
         }
-        else if (buffer[2] == 1)
+        else if (buffer[2] == NET_OBJ_INIT)
         {
             ResolveNetObjInit(buffer);
         }
-        else if (buffer[2] == 3)
+        else if (buffer[2] == SYNC_TIME_MSG)
         {
             ResolveTime(buffer);
+        }
+        else if (buffer[2] == CLIENT_DCD)
+        {
+            ResolveDcd(buffer);
         }
     }
 
@@ -213,7 +218,7 @@ public class NetworkManager : MonoBehaviour
     {
         webSocket = new ClientWebSocket();
         await webSocket.ConnectAsync(uri, cancellation.Token);
-        Debug.Log("WebSocket connection established!");
+        //Debug.Log("WebSocket connection established!");
 
         // Start listening for incoming messages
         connected = true;
@@ -372,17 +377,37 @@ public class NetworkManager : MonoBehaviour
     static NetworkObject newNetObj;
     static void ResolveNetObjInit(byte[] buffer)
     {
-        ushort param_ID = GetBufferUShort(buffer, 3);
-        Debug.Log("NetObjInit param: " + param_ID);
+        ushort param_ID = GetBufferUShort(buffer, 3);        
         if (param_ID < 1024)
         {
+            Debug.Log("Assigned ID: " + GetBufferUShort(buffer, 5));
             initializationLinker[param_ID].AssignObjID(GetBufferUShort(buffer, 5));
             initializationLinker.Remove(param_ID);
         }
         else
         {
-            newNetObj = Instantiate(self.networkPrefabs[param_ID - 1024]).GetComponent<NetworkObject>();
-            newNetObj.AssignObjID(GetBufferUShort(buffer, 5));
+            if (param_ID > self.networkPrefabs.Length + 1024) { Debug.Log("Invalid prefab ID: " + param_ID); }
+            else
+            {
+                Debug.Log("Init NetObj ID: " + (param_ID - 1024));
+                newNetObj = Instantiate(self.networkPrefabs[param_ID - 1024]).GetComponent<NetworkObject>();
+                newNetObj.AssignObjID(GetBufferUShort(buffer, 5));
+            }            
+        }
+    }
+
+    static void ResolveDcd(byte[] buffer)
+    {        
+        ushort id = GetBufferUShort(buffer, 3);        
+        if (networkObjects.ContainsKey(id))
+        {
+            Debug.Log("Disconnecting client ID #" + id);
+            networkObjects[id].OnDcd();
+            networkObjects.Remove(id);
+        }
+        else
+        {
+            Debug.Log("Cannot disconnect client ID #" + id);
         }
     }
 
@@ -395,10 +420,7 @@ public class NetworkManager : MonoBehaviour
         {
             ResolveServerMessage(buffer);
         }
-        else
-        {
-            ProcessUpdate(buffer);
-        }        
+        else { ProcessUpdate(buffer); }
     }
 
     public void ConnectSuccessful()

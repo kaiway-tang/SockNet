@@ -13,8 +13,10 @@ id_end = 64
 
 id_message = bytearray([0, 0, 1, 0, 0, 0, 0])
 time_message = bytearray([0, 0, 3, 0, 0])
+dcd_message = bytearray([0, 0, 4, 0, 0])
 
-sync_package = []
+client_sync_dict = {}
+client_player_ids = {}
 
 def GetID():
     global id_end
@@ -35,8 +37,8 @@ async def HandleServerRequest(message, websocket):
     if message[2] == 0:
         print("new kid")
         await websocket.send(bytearray([0, 0, 0, 0 if host_connected else 1]))
-        for buffer in sync_package:
-            await websocket.send(buffer)
+        for key in client_sync_dict:
+            await websocket.send(client_sync_dict[key])
     
     elif message[2] == 1:
         print("host update")
@@ -58,29 +60,30 @@ async def HandleServerRequest(message, websocket):
             if client != websocket:
                 await client.send(id_message)
 
-        sync_package.append(id_message)
+        client_sync_dict[websocket] = id_message
+        client_player_ids[websocket] = new_id
     
     elif message[2] == 3:
         time_message[3:5] = GetTime()
         await websocket.send(time_message)
     
-    elif message[2] == 4:
-        new_id = GetID()        
+    # elif message[2] == 4:
+    #     new_id = GetID()        
 
-        id_message[3:5] = message[5:7]
-        id_message[5:7] = struct.pack('>H', new_id)
-        # await websocket.send(id_message)
+    #     id_message[3:5] = message[5:7]
+    #     id_message[5:7] = struct.pack('>H', new_id)
+    #     # await websocket.send(id_message)
 
-        prefab_ID = struct.unpack('>H', message[3:5])[0]
-        prefab_ID += 1024
-        id_message[3:5] = struct.pack('>H', prefab_ID)
+    #     prefab_ID = struct.unpack('>H', message[3:5])[0]
+    #     prefab_ID += 1024
+    #     id_message[3:5] = struct.pack('>H', prefab_ID)
 
-        print("assigned ID: ", new_id, " for new prefab ID: ", prefab_ID)
+    #     print("assigned ID: ", new_id, " for new prefab ID: ", prefab_ID)
 
-        for client in connected_clients:
-            await client.send(id_message)
+    #     for client in connected_clients:
+    #         await client.send(id_message)
 
-        sync_package.append(id_message)
+    #     sync_package.append(id_message)
 
 
 async def handle_client(websocket):
@@ -105,6 +108,13 @@ async def handle_client(websocket):
                 print(f"Received message from client {id(websocket)}: {message}")
     finally:
         # Remove the client from our set when they disconnect
+        dcd_message[3:5] = struct.pack('>H', client_player_ids[websocket])
+        for client in connected_clients:
+            if client != websocket:
+                await client.send(dcd_message)
+        print("Removed player ID #", client_player_ids[websocket])
+        id_deque.append(client_player_ids[websocket])
+        del client_sync_dict[websocket]
         connected_clients.remove(websocket)
 
 async def main():

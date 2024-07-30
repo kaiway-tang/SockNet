@@ -117,6 +117,7 @@ MonoBehaviour:
   damageFX: {fileID: 7054499373918468803}
   deathFX: {fileID: 561735546950010099, guid: ab8340135a260da449b3bafba963e2f0, type: 3}
   useDefaultBehavior: 1
+  dontSync: 0
   rootObj: {fileID: 2989247974696865925}
 --- !u!1 &2989247974696865925
 GameObject:

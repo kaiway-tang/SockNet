@@ -171,7 +171,7 @@ MonoBehaviour:
   speed: 7
   jumpPower: 13
   dJumpMultiplier: 1
-  PlayerObj: {fileID: 4542395017445493062}
+  playerTrfm: {fileID: 4542395017445493062}
   lerpRate: 0.2
   camTrfm: {fileID: 4542395017445493059}
   sensitivity: 1
@@ -180,7 +180,7 @@ MonoBehaviour:
   groundDetect: {fileID: 4542395017445493030}
   hpScript: {fileID: 4542395017445493031}
   uiHandler: {fileID: 0}
-  trfm: {fileID: 0}
+  trfm: {fileID: 4542395017445493057}
   dashDistance: 14
   projectiles:
   - {fileID: 201928810244430043, guid: 2c2f859646ff2074ca8ee8053ea2bce6, type: 3}
@@ -471,6 +471,7 @@ MonoBehaviour:
   damageFX: {fileID: 8915322534286773560}
   deathFX: {fileID: 0}
   useDefaultBehavior: 1
+  dontSync: 0
   rootObj: {fileID: 0}
 --- !u!1001 &3962898748863918304
 PrefabInstance:

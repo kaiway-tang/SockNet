@@ -8,7 +8,7 @@ public class PlayerController : NetworkObject
     [SerializeField] float speed;
     [SerializeField] float jumpPower, dJumpMultiplier;
 
-    public Transform PlayerObj;
+    public Transform playerTrfm;
     [SerializeField] float lerpRate;
 
     [SerializeField] Transform camTrfm;
@@ -38,6 +38,11 @@ public class PlayerController : NetworkObject
 
     new void Start()
     {
+        hpScript.OnDamage += GetComponent<PlayerController>().OnDamage;
+        hpScript.useDefaultBehavior = false;
+        playerTrfm.parent = null;
+        SetMana(100);
+
         if (isLocal)
         {
             buffer16 = new byte[16];
@@ -48,71 +53,25 @@ public class PlayerController : NetworkObject
 
             Cursor.visible = false;
             Cursor.lockState = CursorLockMode.Locked;
-        }
 
-        hpScript.OnDamage += GetComponent<PlayerController>().OnDamage;
-        hpScript.useDefaultBehavior = false;
-        PlayerObj.parent = null;
-
-        uiHandler.SetHP(100);
-        mana = 100;
-        uiHandler.mana = 100;
+            uiHandler.SetHP(100);
+        }        
     }
 
     private void Update()
     {
         if (dead)
         {
-            trfm.position = Vector3.zero + Vector3.up * 2;
-            hpScript.HP = 100;
-            mana = 100;
-
-            if (isLocal)
-            {
-                uiHandler.mana = 100;
-                uiHandler.SetHP(100);
-            }            
-            
-            hpScript.SyncHP();
-            dead = false;
+            Respawn();
             return;
         }
 
         if (isLocal)
         {
-            if (UpdateKeyStatuses())
-            {
-                SendTrfm();
-            }
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                if (OnGround())
-                {
-                    velocityVect = rb.velocity;
-                    velocityVect.y = jumpPower;
-                    rb.velocity = velocityVect;
+            if (Input.GetKeyDown(KeyCode.Space)) { Jump(); }
+            if (UpdateKeyStatuses()) { SendTrfm(); }
 
-                    buffer6[5] = 0;
-                }
-                else if (mana > 20)
-                {
-                    velocityVect = rb.velocity;
-                    velocityVect.y = jumpPower * dJumpMultiplier;
-                    rb.velocity = velocityVect;
-                    mana -= 20;
-
-                    buffer6[5] = 1;
-                }
-
-                buffer6[2] = 4;
-                NetworkManager.SetBufferTime(buffer6, 3);
-                NetworkManager.Send(buffer6);
-            }
-
-            if (updateTimeout < 0)
-            {
-                SendTrfm();
-            }
+            if (updateTimeout < 0) { SendTrfm(); }
             updateTimeout -= Time.deltaTime;
 
             HandleRotationInput();
@@ -122,6 +81,8 @@ public class PlayerController : NetworkObject
         HandleTimers();
         UpdateVelocity();
     }
+
+    #region UPDATE_CALLS
 
     void HandleTimers()
     {
@@ -133,18 +94,158 @@ public class PlayerController : NetworkObject
                 slashFX.Stop();
             }
         }
+    }
 
-        if (vanished)
+    void Respawn()
+    {
+        trfm.position = Vector3.zero + Vector3.up * 2;
+        SetHP(100);
+        SetMana(100);
+        dead = false;
+    }
+
+    void Jump()
+    {
+        if (OnGround())
         {
-            mana -= Time.deltaTime * 10;
-            if (mana < 0)
+            velocityVect = rb.velocity;
+            velocityVect.y = jumpPower;
+            rb.velocity = velocityVect;
+
+            buffer6[5] = 0;
+        }
+        else if (mana >= 200)
+        {
+            velocityVect = rb.velocity;
+            velocityVect.y = jumpPower * dJumpMultiplier;
+            rb.velocity = velocityVect;
+            AddMana(-200);
+
+            buffer6[5] = 1;
+        }
+
+        buffer6[2] = 4;
+        NetworkManager.SetBufferTime(buffer6, 3);
+        NetworkManager.Send(buffer6);
+    }
+
+    #endregion
+
+    #region ABILITIES
+
+    [SerializeField] float dashDistance;
+
+    byte projectileType;
+    [SerializeField] GameObject[] projectiles;
+
+    [SerializeField] GameObject clone;
+    [SerializeField] MeshRenderer[] playerMeshes;
+
+    [SerializeField] Transform firePoint;
+    [SerializeField] ParticleSystem slashFX;
+    [SerializeField] Clone activeClone;
+    int mana;
+
+    float slashTimer;
+
+    bool vanished;
+
+    RaycastHit rayHit;
+    float rayHitDist;
+    void HandleAbilities()
+    {
+        if (mana > 200)
+        {
+            if (Input.GetMouseButtonDown(0))
             {
-                mana = 0;
-                EndVanish(true);
+                if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.terrainMask))
+                {
+                    rayHitDist = rayHit.distance;
+                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, rayHitDist, Tools.hurtboxMask))
+                    {
+                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
+                    }
+                    else if (Physics.Raycast(camTrfm.position + camTrfm.right * 0.4f, camTrfm.forward, out rayHit, rayHitDist, Tools.hurtboxMask))
+                    {
+                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
+                    }
+                    transform.position = playerTrfm.position + camTrfm.forward * rayHitDist + Vector3.up * 1.1f;
+                }
+                else
+                {
+                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.hurtboxMask))
+                    {
+                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
+                    }
+                    transform.position = playerTrfm.position + camTrfm.forward * dashDistance;
+                }
+
+                AddMana(-200);
+                CastSlash();
+
+                buffer4[FUNCTION_ID] = SLASH_UPDATE;
+                NetworkManager.Send(buffer4);
+                SendTrfm();
             }
-            if (isLocal) { uiHandler.mana = mana; }
+            if (Input.GetMouseButtonDown(1))
+            {
+                Instantiate(projectiles[projectileType], firePoint.position, firePoint.rotation).GetComponent<Projectile>().Init(objID, 0, isLocal);
+                SendProjectileAction();
+                AddMana(-200);
+            }
+            if (Input.GetKeyDown(KeyCode.LeftShift))
+            {
+                CastVanish();
+                AddMana(-200);
+                buffer4[FUNCTION_ID] = VANISH_UPDATE;
+                buffer4[3] = 1;
+                NetworkManager.Send(buffer4);
+            }
+        }
+
+        if (Input.GetKeyUp(KeyCode.LeftShift))
+        {
+            if (vanished) { EndVanish(); }
         }
     }
+
+    void CastSlash()
+    {
+        //PlayerObj.position = transform.position;
+        slashFX.Play();
+        slashTimer = 0.2f;
+    }
+
+    void CastVanish()
+    {
+        activeClone = Instantiate(clone, trfm.position, trfm.rotation).GetComponent<Clone>();
+        activeClone.Init(playerTrfm.position);
+
+        for (int i = 0; i < playerMeshes.Length; i++)
+        {
+            playerMeshes[i].enabled = false;
+        }
+        vanished = true;
+    }
+
+    void EndVanish()
+    {
+        if (isLocal)
+        {
+            buffer4[2] = 2;
+            buffer4[3] = 0;
+            NetworkManager.Send(buffer4);
+        }
+
+        for (int i = 0; i < playerMeshes.Length; i++)
+        {
+            playerMeshes[i].enabled = true;
+        }
+
+        activeClone.End();
+        vanished = false;
+    }
+    #endregion
 
     #region NETWORKING
 
@@ -164,6 +265,12 @@ public class PlayerController : NetworkObject
         }        
     }
 
+    public override void OnDcd()
+    {
+        Destroy(playerTrfm.gameObject);
+        Destroy(gameObject);
+    }
+
     float updateTimeout;
     bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
 
@@ -172,16 +279,16 @@ public class PlayerController : NetworkObject
     byte[] buffer6;
     byte[] buffer4;
 
-    public void SendAction()
+    public void SendProjectileAction()
     {
         if (!IsConnected()) { return; }
 
         buffer16[2] = 1;
         buffer16[3] = projectileType;
         NetworkManager.SetBufferTime(buffer16, 4);
-        NetworkManager.SetBufferCoords(buffer16, PlayerObj.position, 6);
+        NetworkManager.SetBufferCoords(buffer16, playerTrfm.position, 6);
 
-        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(PlayerObj.eulerAngles.y), 12);
+        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(playerTrfm.eulerAngles.y), 12);
         NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(camTrfm.localEulerAngles.x), 14);
 
         NetworkManager.Send(buffer16);
@@ -196,7 +303,7 @@ public class PlayerController : NetworkObject
 
         NetworkManager.SetBufferCoords(buffer16, trfm.position);
 
-        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(PlayerObj.eulerAngles.y), 11);
+        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(playerTrfm.eulerAngles.y), 11);
         NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(camTrfm.localEulerAngles.x), 13);
 
         temp = keyFwd ? 8 : 0;
@@ -209,41 +316,41 @@ public class PlayerController : NetworkObject
         NetworkManager.Send(buffer16);
     }
 
+    const int FUNCTION_ID = 2;
+    const int TRFM_UPDATE = 0, PROJECTILE_UPDATE = 1, VANISH_UPDATE = 2, SLASH_UPDATE = 3, JUMP_UPDATE = 4, HP_UPDATE = 223;
     public override void NetworkUpdate(byte[] buffer)
     {        
-        if (buffer[2] == 223)
+        if (buffer[FUNCTION_ID] == HP_UPDATE)
         {
-            Debug.Log("Player recv: " + buffer[0] + " " + buffer[1] + " " + buffer[2] + " " + buffer[3] + " " + buffer[4]);
             hpScript.ResolveHP(buffer);
         }
 
         if (isLocal) return;
-        if (buffer[2] == 0)
-        {
-            HandleTrfmUpdate(buffer);
-        }
-        else if (buffer[2] == 1)
-        {
-            mana -= 20;
 
-            PlayerObj.position = NetworkManager.GetBufferCoords(buffer, 6);
+        if (buffer[FUNCTION_ID] == TRFM_UPDATE) { HandleTrfmUpdate(buffer); }
+
+        else if (buffer[FUNCTION_ID] == PROJECTILE_UPDATE)
+        {
+            AddMana(-200);
+
+            playerTrfm.position = NetworkManager.GetBufferCoords(buffer, 6);
             SetRotation(NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 14)), NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 12)));
 
             Instantiate(projectiles[buffer[3]], firePoint.position, firePoint.rotation)
                 .GetComponent<Projectile>().Init(objID, NetworkManager.GetBufferDelta(buffer, 4), isLocal);
                 //.GetComponent<Projectile>().Init(objID, 0);
         }
-        else if (buffer[2] == 2)
+
+        else if (buffer[FUNCTION_ID] == VANISH_UPDATE)
         {
-            mana -= 20;
+            AddMana(-200);
             if (buffer[3] == 1) { CastVanish(); }
-            else { EndVanish(false); }
+            else { EndVanish(); }
         }
-        else if (buffer[2] == 3)
-        {
-            CastSlash();
-        }
-        else if (buffer[2] == 4)
+
+        else if (buffer[FUNCTION_ID] == SLASH_UPDATE) { CastSlash(); }
+
+        else if (buffer[FUNCTION_ID] == JUMP_UPDATE)
         {
             velocityVect = rb.velocity;
             velocityVect.y = jumpPower;
@@ -251,7 +358,7 @@ public class PlayerController : NetworkObject
             if (buffer[5] == 1)
             {
                 velocityVect.y *= dJumpMultiplier;
-                mana -= 20;
+                AddMana(-200);
             }
             rb.velocity = velocityVect;
         } 
@@ -270,128 +377,13 @@ public class PlayerController : NetworkObject
 
         Update();
 
+        //player dead reckoning:
         //transform.position += rb.velocity * NetworkManager.GetBufferDelay(buffer, 2);
     }
 
     #endregion
 
     #region HANDLE_INPUT
-
-    [SerializeField] float dashDistance;
-
-    byte projectileType;
-    [SerializeField] GameObject[] projectiles;
-
-    [SerializeField] GameObject clone;
-    [SerializeField] MeshRenderer[] playerMeshes;
-
-    [SerializeField] Transform firePoint;
-    [SerializeField] ParticleSystem slashFX;
-    [SerializeField] Clone activeClone;
-    float mana;
-
-    float slashTimer;
-
-    bool vanished;
-
-    RaycastHit rayHit;
-    float rayHitDist;
-
-    void HandleAbilities()
-    {
-        if (mana > 20)
-        {
-            if (Input.GetMouseButtonDown(0))
-            {
-                if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.terrainMask))
-                {
-                    rayHitDist = rayHit.distance;
-                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, rayHitDist, Tools.hurtboxMask))
-                    {
-                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
-                    }                   
-                    transform.position = PlayerObj.position + camTrfm.forward * rayHitDist + Vector3.up * 1.1f;
-                }
-                else
-                {
-                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.hurtboxMask))
-                    {
-                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
-                    }
-                    transform.position = PlayerObj.position + camTrfm.forward * dashDistance;
-                }
-
-                mana -= 20;
-                CastSlash();
-                SendTrfm();
-            }
-            if (Input.GetMouseButtonDown(1))
-            {
-                Instantiate(projectiles[projectileType], firePoint.position, firePoint.rotation).GetComponent<Projectile>().Init(objID, 0, isLocal);
-                SendAction();
-                mana -= 20;
-            }
-            if (Input.GetKeyDown(KeyCode.LeftShift))
-            {
-                CastVanish();                
-                mana -= 20;
-                buffer4[2] = 2;
-                buffer4[3] = 1;
-                NetworkManager.Send(buffer4);
-            }            
-        }
-
-        if (Input.GetKeyUp(KeyCode.LeftShift))
-        {
-            if (vanished) { EndVanish(true); }
-        }
-
-
-        if (!vanished && mana < 100)
-        {
-            mana += Time.deltaTime * 10;
-            if (mana > 100) { mana = 100; }
-
-            if (isLocal) { uiHandler.mana = mana; }            
-        }
-    }
-
-    void CastSlash()
-    {        
-        //PlayerObj.position = transform.position;
-        slashFX.Play();
-        slashTimer = 0.2f;
-    }
-
-    void CastVanish()
-    {
-        activeClone = Instantiate(clone, trfm.position, trfm.rotation).GetComponent<Clone>();
-        activeClone.Init(PlayerObj.position);
-
-        for (int i = 0; i < playerMeshes.Length; i++)
-        {
-            playerMeshes[i].enabled = false;
-        }
-        vanished = true;
-    }
-
-    void EndVanish(bool sendUpdate)
-    {
-        if (sendUpdate)
-        {
-            buffer4[2] = 2;
-            buffer4[3] = 0;
-            NetworkManager.Send(buffer4);
-        }
-
-        for (int i = 0; i < playerMeshes.Length; i++)
-        {
-            playerMeshes[i].enabled = true;
-        }
-
-        activeClone.End();
-        vanished = false;
-    }
 
     bool inputUpdate;
     bool UpdateKeyStatuses()
@@ -419,7 +411,7 @@ public class PlayerController : NetworkObject
         xMouse = Input.GetAxis("MX") * sensitivity;
 
         camTrfm.Rotate(Vector3.right * yMouse);
-        PlayerObj.Rotate(Vector3.up * xMouse);
+        playerTrfm.Rotate(Vector3.up * xMouse);
 
         if (Mathf.Abs(xMouse) > 0.1f && updateTimeout < 0.05f + Mathf.Abs(xMouse) * 0.1f && updateTimeout < 0.15f)
         {
@@ -490,32 +482,38 @@ public class PlayerController : NetworkObject
             }
         }
 
-        velocityVect = PlayerObj.forward * velocityVect.z + PlayerObj.right * velocityVect.x;
+        velocityVect = playerTrfm.forward * velocityVect.z + playerTrfm.right * velocityVect.x;
         velocityVect.y = rb.velocity.y;
         rb.velocity = velocityVect;
     }
 
     [SerializeField] float yMouse, xMouse;
 
+    #region EXTERNAL_SCRIPTS
+
     bool OnGround()
     {
         return groundDetect.touchCount > 0;
     }
 
+    int calcHP;
     public void OnDamage(ushort amount, ushort sourceID)
     {
-        //flag
         hpScript.damageFX.Play();
-        hpScript.HP -= amount;
+        calcHP = hpScript.HP - amount;
 
-        if (hpScript.HP < 0.01)
+        if (calcHP < 0.01)
         {
-            hpScript.HP = 0;
-            dead = true;            
+            SetHP(0);
+            dead = true;
         }
-
-        if (isLocal) { uiHandler.SetHP(hpScript.HP); }
+        else
+        {
+            SetHP((ushort)calcHP);
+        }
     }
+
+    #endregion
 
     [SerializeField] float targetYRot, targetXRot;
     Vector3 eulerAngles;
@@ -527,22 +525,66 @@ public class PlayerController : NetworkObject
             rb.velocity = Vector3.zero;
         }
 
-        PlayerObj.position += (transform.position - PlayerObj.position) * lerpRate;     
+        playerTrfm.position += (transform.position - playerTrfm.position) * lerpRate;     
 
         if (!isLocal)
         {
-            SetRotation(Tools.RotationalLerp(camTrfm.localEulerAngles.x, targetXRot, 0.5f), Tools.RotationalLerp(PlayerObj.localEulerAngles.y, targetYRot, 0.5f));
+            SetRotation(Tools.RotationalLerp(camTrfm.localEulerAngles.x, targetXRot, 0.5f), Tools.RotationalLerp(playerTrfm.localEulerAngles.y, targetYRot, 0.5f));
         }
+
+        if (vanished)
+        {
+            AddMana(-2);
+            if (mana < 1 && isLocal)
+            {
+                EndVanish();
+                SetMana(0);
+            }
+        }
+        else
+        {
+            if (mana < 1000)
+            {
+                AddMana(2);
+                if (mana > 1000)
+                {
+                    SetMana(1000);
+                }
+            }
+        }
+    }
+
+    #region HELPERS
+
+    void SetHP(ushort value, bool sync = true)
+    {
+        if (isLocal) { uiHandler.SetHP(value); }
+        hpScript.HP = value;
+        if (sync) { hpScript.SyncHP(); }        
+    }
+
+    void SetMana(int value)
+    {
+        mana = value;
+        if (isLocal) { uiHandler.SetMana(mana); }
+    }
+
+    void AddMana(int amount)
+    {
+        mana += amount;
+        if (isLocal) { uiHandler.SetMana(mana); }
     }
 
     void SetRotation(float x, float y)
     {
-        eulerAngles = PlayerObj.eulerAngles;
+        eulerAngles = playerTrfm.eulerAngles;
         eulerAngles.y = y;
-        PlayerObj.eulerAngles = eulerAngles;
+        playerTrfm.eulerAngles = eulerAngles;
 
         eulerAngles = camTrfm.localEulerAngles;
         eulerAngles.x = x;
         camTrfm.localEulerAngles = eulerAngles;
     }
+
+    #endregion
 }

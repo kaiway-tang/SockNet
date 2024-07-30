@@ -27,4 +27,9 @@ public class NetworkObject : MonoBehaviour
     {
 
     }
+
+    public virtual void OnDcd()
+    {
+        Destroy(gameObject);
+    }
 }
