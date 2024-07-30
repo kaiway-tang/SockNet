@@ -20,7 +20,7 @@ public class NetworkObject : MonoBehaviour
     {
         objID = ID;
         NetworkManager.networkObjects.Add(ID, GetComponent<NetworkObject>());        
-        connected = true;
+        connected = true;        
     }
 
     public virtual void NetworkUpdate(byte[] buffer)

@@ -119,7 +119,7 @@ public class PlayerController : NetworkObject
                 if (mana > 0)
                 {
                     mana -= 1;
-                    uiHandler.mana = mana;
+                    if (isLocal) { uiHandler.mana = mana; }                    
                     vanishTimer += 0.1f;
                 }
                 else
@@ -136,16 +136,17 @@ public class PlayerController : NetworkObject
     public override void AssignObjID(ushort ID)
     {
         base.AssignObjID(ID);
+
+        if (isLocal) { playerObjID = ID; }        
+        hpScript.objID = ID;
+        //Debug.Log("player received ID: " + ID);
+
         if (isLocal)
         {
-            playerObjID = ID;
-            hpScript.objID = ID;
-            Debug.Log("player received ID: " + ID);
-
             NetworkManager.SetBufferUShort(buffer16, playerObjID);
             NetworkManager.SetBufferUShort(buffer6, playerObjID);
             NetworkManager.SetBufferUShort(buffer4, playerObjID);
-        }      
+        }        
     }
 
     float updateTimeout;
@@ -200,6 +201,10 @@ public class PlayerController : NetworkObject
         {
             HandleTrfmUpdate(buffer);
         }
+        else if (buffer[2] == 223)
+        {
+            hpScript.ResolveHP(buffer);
+        }
         else if (buffer[2] == 1)
         {
             mana -= 20;
@@ -209,7 +214,7 @@ public class PlayerController : NetworkObject
 
             Debug.Log("buffer delta: " + NetworkManager.GetBufferDelta(buffer, 4));
             Instantiate(projectiles[buffer[3]], firePoint.position, firePoint.rotation)
-                .GetComponent<Projectile>().Init(objID, NetworkManager.GetBufferDelta(buffer, 4));
+                .GetComponent<Projectile>().Init(objID, NetworkManager.GetBufferDelta(buffer, 4), isLocal);
                 //.GetComponent<Projectile>().Init(objID, 0);
         }
         else if (buffer[2] == 2)
@@ -229,7 +234,7 @@ public class PlayerController : NetworkObject
                 mana -= 20;
             }
             rb.velocity = velocityVect;
-        }
+        } 
     }
 
     void HandleTrfmUpdate(byte[] buffer)
@@ -271,6 +276,7 @@ public class PlayerController : NetworkObject
     bool vanished;
 
     RaycastHit rayHit;
+    float rayHitDist;
 
     void HandleAbilities()
     {
@@ -280,10 +286,19 @@ public class PlayerController : NetworkObject
             {
                 if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.terrainMask))
                 {
-                    transform.position = PlayerObj.position + camTrfm.forward * rayHit.distance + Vector3.up * 0.4f;
+                    rayHitDist = rayHit.distance;
+                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, rayHitDist, Tools.hurtboxMask))
+                    {
+                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
+                    }                   
+                    transform.position = PlayerObj.position + camTrfm.forward * rayHitDist + Vector3.up * 0.4f;
                 }
                 else
                 {
+                    if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.hurtboxMask))
+                    {
+                        rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
+                    }
                     transform.position = PlayerObj.position + camTrfm.forward * dashDistance;
                 }
 
@@ -293,7 +308,7 @@ public class PlayerController : NetworkObject
             }
             if (Input.GetMouseButtonDown(1))
             {
-                Instantiate(projectiles[projectileType], firePoint.position, firePoint.rotation).GetComponent<Projectile>().Init(objID, 0);
+                Instantiate(projectiles[projectileType], firePoint.position, firePoint.rotation).GetComponent<Projectile>().Init(objID, 0, isLocal);
                 SendAction();
                 mana -= 20;
             }
@@ -316,9 +331,9 @@ public class PlayerController : NetworkObject
         if (!vanished && mana < 100)
         {
             mana += Time.deltaTime * 10;
-            uiHandler.mana = mana;
-
             if (mana > 100) { mana = 100; }
+
+            if (isLocal) { uiHandler.mana = mana; }            
         }
     }
 
@@ -470,12 +485,13 @@ public class PlayerController : NetworkObject
         return groundDetect.touchCount > 0;
     }
 
-    public void OnDamage(int amount, ushort sourceID)
+    public void OnDamage(ushort amount, ushort sourceID)
     {
+        //flag
         hpScript.damageFX.Play();
         hpScript.HP -= amount;
 
-        uiHandler.SetHP(hpScript.HP);
+        if (isLocal) { uiHandler.SetHP(hpScript.HP); }
 
         if (hpScript.HP < 0.01)
         {
@@ -499,10 +515,6 @@ public class PlayerController : NetworkObject
         if (!isLocal)
         {
             SetRotation(Tools.RotationalLerp(camTrfm.localEulerAngles.x, targetXRot, 0.5f), Tools.RotationalLerp(PlayerObj.localEulerAngles.y, targetYRot, 0.5f));
-        }
-        else
-        {
-            tmp.text = "Mana: " + Mathf.RoundToInt(mana).ToString();
         }
     }
 

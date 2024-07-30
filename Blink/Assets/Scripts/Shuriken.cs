@@ -9,9 +9,9 @@ public class Shuriken : Projectile
 
     bool init = false;
 
-    public override void Init(ushort ownerID, float timeDelta)
+    public override void Init(ushort ownerID, float timeDelta, bool pIsLocal)
     {        
-        base.Init(ownerID, timeDelta);
+        base.Init(ownerID, timeDelta, pIsLocal);
         trfm.position += trfm.forward * speed * timeDelta;
         init = true;
     }
@@ -33,7 +33,7 @@ public class Shuriken : Projectile
                 target = other.GetComponent<HPEntity>();
                 if (target.objID != ownerID)
                 {
-                    target.TakeDamage(damage, ownerID);
+                    target.TakeDamage(damage, ownerID, isLocal);
                 }
                 else
                 {

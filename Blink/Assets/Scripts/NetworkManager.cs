@@ -141,7 +141,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     public static void SetBufferUShort(byte[] buffer, ushort val, int startIndex = 0)
-    {
+    {        
         buffer[startIndex] = (byte)(val >> 8);
         buffer[startIndex + 1] = (byte)(val & 0xFF);
     }
