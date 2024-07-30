@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class Tools : MonoBehaviour
 {
+    public static int hurtboxMask = 1 << 6;
+    public static int terrainMask = 1 << 8;
     public static float RotationalLerp(float start, float dest, float rate)
     {
         if (Mathf.Abs(dest - start) < 180)

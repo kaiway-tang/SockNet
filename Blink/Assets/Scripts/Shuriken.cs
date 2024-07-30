@@ -7,10 +7,13 @@ public class Shuriken : Projectile
     [SerializeField] ParticleSystem trail;
     [SerializeField] float speed;
 
+    bool init = false;
+
     public override void Init(ushort ownerID, float timeDelta)
-    {
+    {        
         base.Init(ownerID, timeDelta);
-        trfm.position += trfm.forward * speed * timeDelta;        
+        trfm.position += trfm.forward * speed * timeDelta;
+        init = true;
     }
 
     // Update is called once per frame
@@ -22,6 +25,7 @@ public class Shuriken : Projectile
     HPEntity target;
     private void OnTriggerEnter(Collider other)
     {
+        if (!init) { return; }
         if (other.gameObject.layer == 6 || other.gameObject.layer == 8)
         {
             if (other.gameObject.layer == 6)

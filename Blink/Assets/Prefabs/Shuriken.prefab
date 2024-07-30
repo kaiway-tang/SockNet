@@ -47,7 +47,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5fb35e461c6af254eaf8eae44f8a76f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  objID: 0
+  ownerID: 0
+  damage: 20
   trail: {fileID: 3416413821850582629}
   speed: 60
 --- !u!136 &5022067713393123712
@@ -60,7 +61,7 @@ CapsuleCollider:
   m_Material: {fileID: 0}
   m_IsTrigger: 1
   m_Enabled: 1
-  m_Radius: 0.2
+  m_Radius: 0.1
   m_Height: 1
   m_Direction: 2
   m_Center: {x: 0, y: 0, z: 0}
