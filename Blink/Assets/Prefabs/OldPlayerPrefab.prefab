@@ -162,7 +162,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4542395017445493114, guid: 292008752f198aa41a239bdff69ca252, type: 3}
       propertyPath: m_Name
-      value: PlayerPrefab
+      value: OldPlayerPrefab
       objectReference: {fileID: 0}
     - target: {fileID: 4542395017445493115, guid: 292008752f198aa41a239bdff69ca252, type: 3}
       propertyPath: m_IsActive

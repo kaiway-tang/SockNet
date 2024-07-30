@@ -9,7 +9,7 @@ connected_clients = set()
 
 host_connected = False
 id_deque = deque()
-id_end = 1
+id_end = 64
 
 id_message = bytearray([0, 0, 1, 0, 0, 0, 0])
 time_message = bytearray([0, 0, 3, 0, 0])

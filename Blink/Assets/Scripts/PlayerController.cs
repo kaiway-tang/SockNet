@@ -19,6 +19,8 @@ public class PlayerController : NetworkObject
 
     [SerializeField] GroundDetect groundDetect;
     [SerializeField] HPEntity hpScript;
+    bool dead, invuln;
+
     [SerializeField] PlayerUIHandler uiHandler;
     public static ushort playerObjID;
 
@@ -50,11 +52,32 @@ public class PlayerController : NetworkObject
 
         hpScript.OnDamage += GetComponent<PlayerController>().OnDamage;
         hpScript.useDefaultBehavior = false;
-        PlayerObj.parent = null;        
+        PlayerObj.parent = null;
+
+        uiHandler.SetHP(100);
+        mana = 100;
+        uiHandler.mana = 100;
     }
 
     private void Update()
     {
+        if (dead)
+        {
+            trfm.position = Vector3.zero + Vector3.up * 2;
+            hpScript.HP = 100;
+            mana = 100;
+
+            if (isLocal)
+            {
+                uiHandler.mana = 100;
+                uiHandler.SetHP(100);
+            }            
+            
+            hpScript.SyncHP();
+            dead = false;
+            return;
+        }
+
         if (isLocal)
         {
             if (UpdateKeyStatuses())
@@ -111,23 +134,15 @@ public class PlayerController : NetworkObject
             }
         }
 
-        if (vanished && vanishTimer > 0)
+        if (vanished)
         {
-            vanishTimer -= Time.deltaTime;
-            if (vanishTimer <= 0)
+            mana -= Time.deltaTime * 10;
+            if (mana < 0)
             {
-                if (mana > 0)
-                {
-                    mana -= 1;
-                    if (isLocal) { uiHandler.mana = mana; }                    
-                    vanishTimer += 0.1f;
-                }
-                else
-                {
-                    mana = 0;
-                    EndVanish(true);
-                }
+                mana = 0;
+                EndVanish(true);
             }
+            if (isLocal) { uiHandler.mana = mana; }
         }
     }
 
@@ -195,15 +210,17 @@ public class PlayerController : NetworkObject
     }
 
     public override void NetworkUpdate(byte[] buffer)
-    {
+    {        
+        if (buffer[2] == 223)
+        {
+            Debug.Log("Player recv: " + buffer[0] + " " + buffer[1] + " " + buffer[2] + " " + buffer[3] + " " + buffer[4]);
+            hpScript.ResolveHP(buffer);
+        }
+
         if (isLocal) return;
         if (buffer[2] == 0)
         {
             HandleTrfmUpdate(buffer);
-        }
-        else if (buffer[2] == 223)
-        {
-            hpScript.ResolveHP(buffer);
         }
         else if (buffer[2] == 1)
         {
@@ -212,7 +229,6 @@ public class PlayerController : NetworkObject
             PlayerObj.position = NetworkManager.GetBufferCoords(buffer, 6);
             SetRotation(NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 14)), NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 12)));
 
-            Debug.Log("buffer delta: " + NetworkManager.GetBufferDelta(buffer, 4));
             Instantiate(projectiles[buffer[3]], firePoint.position, firePoint.rotation)
                 .GetComponent<Projectile>().Init(objID, NetworkManager.GetBufferDelta(buffer, 4), isLocal);
                 //.GetComponent<Projectile>().Init(objID, 0);
@@ -222,6 +238,10 @@ public class PlayerController : NetworkObject
             mana -= 20;
             if (buffer[3] == 1) { CastVanish(); }
             else { EndVanish(false); }
+        }
+        else if (buffer[2] == 3)
+        {
+            CastSlash();
         }
         else if (buffer[2] == 4)
         {
@@ -271,7 +291,6 @@ public class PlayerController : NetworkObject
     float mana;
 
     float slashTimer;
-    float vanishTimer;
 
     bool vanished;
 
@@ -291,7 +310,7 @@ public class PlayerController : NetworkObject
                     {
                         rayHit.collider.GetComponent<HPEntity>().TakeDamage(80, objID, true);
                     }                   
-                    transform.position = PlayerObj.position + camTrfm.forward * rayHitDist + Vector3.up * 0.4f;
+                    transform.position = PlayerObj.position + camTrfm.forward * rayHitDist + Vector3.up * 1.1f;
                 }
                 else
                 {
@@ -353,8 +372,6 @@ public class PlayerController : NetworkObject
         {
             playerMeshes[i].enabled = false;
         }
-
-        vanishTimer = 0.1f;
         vanished = true;
     }
 
@@ -491,13 +508,13 @@ public class PlayerController : NetworkObject
         hpScript.damageFX.Play();
         hpScript.HP -= amount;
 
-        if (isLocal) { uiHandler.SetHP(hpScript.HP); }
-
         if (hpScript.HP < 0.01)
         {
-            hpScript.HP = 100;
-            trfm.position = Vector3.zero;
+            hpScript.HP = 0;
+            dead = true;            
         }
+
+        if (isLocal) { uiHandler.SetHP(hpScript.HP); }
     }
 
     [SerializeField] float targetYRot, targetXRot;
