@@ -8,13 +8,15 @@ public class Projectile : MonoBehaviour
     public ushort ownerID;
     [SerializeField] protected ushort damage;
 
-    protected bool isLocal;
-    public virtual void Init(ushort pOwnerID, float timeDelta, bool pIsLocal)
+    [SerializeField] protected byte syncMethod;
+    [SerializeField] protected uint eventID;
+    public virtual void Init(ushort pOwnerID, float timeDelta, byte pSyncMethod = HPEntity.DONT_SYNC, uint pEventID = 0)
     {
         Invoke("End", 5);
         trfm = transform;
         ownerID = pOwnerID;
-        isLocal = pIsLocal;
+        syncMethod = pSyncMethod;
+        eventID = pEventID;
     }    
 
     protected virtual void End() { }

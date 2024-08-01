@@ -22,7 +22,7 @@ public class NetworkManager : MonoBehaviour
     public GameObject[] networkPrefabs;
 
     public static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
-    public static PlayerController[] players;
+    public static List<PlayerController> players = new List<PlayerController>();
 
     public static float time;
 
@@ -145,6 +145,16 @@ public class NetworkManager : MonoBehaviour
         buffer[startIndex] = (byte)(val >> 8);
         buffer[startIndex + 1] = (byte)(val & 0xFF);
     }
+    public static void SetBufferUInt(byte[] buffer, uint val, int startIndex = 0)
+    {
+        buffer[startIndex + 3] = (byte)(val & 0xFF);
+        val = val >> 8;
+        buffer[startIndex + 2] = (byte)(val & 0xFF);
+        val = val >> 8;
+        buffer[startIndex + 1] = (byte)(val & 0xFF);
+        val = val >> 8;
+        buffer[startIndex] = (byte)(val & 0xFF);
+    }
 
     public static void SetBufferTime(byte[] buffer, int startIndex = 0)
     {
@@ -174,6 +184,11 @@ public class NetworkManager : MonoBehaviour
     public static ushort GetBufferUShort(byte[] buffer, int startIndex = 0)
     {
         return (ushort)(buffer[startIndex] << 8 | buffer[startIndex + 1]);
+    }
+
+    public static uint GetBufferUInt(byte[] buffer, int startIndex = 0)
+    {
+        return (uint)(buffer[startIndex] << 24 | buffer[startIndex + 1] << 16 | buffer[startIndex + 2] << 8 | buffer[startIndex + 3]);
     }
 
     public static float GetBufferDelta(byte[] buffer, int startIndex = 0)
@@ -230,29 +245,6 @@ public class NetworkManager : MonoBehaviour
             Send(initializationQue[i]);
         }
         await Receive();
-
-        return;
-
-        try
-        {
-            await webSocket.ConnectAsync(uri, cancellation.Token);
-            Debug.Log("WebSocket connection established!");
-
-            // Start listening for incoming messages
-            connected = true;
-            //byte[] initialMessage = { 0, 0, 0 };            
-            await ExeSend(initialMessage);
-            SyncTime();
-            for (int i = 0; i < initializationQue.Count; i++)
-            {
-                Send(initializationQue[i]);
-            }
-            await Receive();            
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("WebSocket connection error: " + e.Message);
-        }
     }
 
     private async Task Receive()
@@ -392,6 +384,11 @@ public class NetworkManager : MonoBehaviour
                 Debug.Log("Init NetObj ID: " + (param_ID - 1024));
                 newNetObj = Instantiate(self.networkPrefabs[param_ID - 1024]).GetComponent<NetworkObject>();
                 newNetObj.AssignObjID(GetBufferUShort(buffer, 5));
+
+                if (param_ID - 1024 == 0)
+                {
+                    players.Add(newNetObj.GetComponent<PlayerController>());
+                }
             }            
         }
     }

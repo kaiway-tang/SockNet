@@ -20,6 +20,8 @@ client_player_ids = {}
 
 def GetID():
     global id_end
+
+
     if len(id_deque) > 0:
         return id_deque.pop()
     id_end += 1
