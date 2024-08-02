@@ -51,7 +51,11 @@ public class Enemy : MonoBehaviour
 
     protected Transform GetTargetTrfm()
     {
-        return targetPlayer.targetTrfm;
+        if (targetPlayer.targetTrfm)
+        {
+            return targetPlayer.targetTrfm;
+        }
+        return targetPlayer.trfm;
     }
 
     protected void FaceTargetPlayer()

@@ -41,11 +41,8 @@ public class Shuriken : Projectile
             target = other.gameObject.GetComponent<HPEntity>();
             if (target.objID != ownerID || ownerID == 0)
             {
-                if (syncMethod != HPEntity.DONT_SYNC)
-                {
-                    damageDealt = true;
-                    target.TakeDamage(damage, ownerID, syncMethod, eventID);
-                }                
+                damageDealt = true;
+                target.TakeDamage(damage, ownerID, syncMethod, eventID);
             }
             else
             {

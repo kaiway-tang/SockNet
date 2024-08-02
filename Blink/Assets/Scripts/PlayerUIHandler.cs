@@ -2,23 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerUIHandler : MonoBehaviour
+public class PlayerUIHandler : UIHandler
 {
     [SerializeField] SpriteRenderer[] manaDiamonds;
     [SerializeField] Transform manaBar;
 
-    [SerializeField] Transform HPbar;
-
-    Vector3 barVect = Vector3.one;
     // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
 
-    private void FixedUpdate()
+    public override void Init(int pMaxHP)
     {
-        
+        base.Init(pMaxHP);
     }
 
     int mana, lastMana;
@@ -55,12 +48,6 @@ public class PlayerUIHandler : MonoBehaviour
         manaDiamonds[2].enabled = mana >= 600;
         manaDiamonds[3].enabled = mana >= 800;
         manaDiamonds[4].enabled = mana >= 998;
-    }
-
-    public void SetHP(float hp)
-    {
-        barVect.x = hp / 100;
-        HPbar.localScale = barVect;
     }
 
     // Update is called once per frame

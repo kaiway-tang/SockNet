@@ -24,7 +24,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 67435578222692518}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.7, y: 0, z: 0}
+  m_LocalPosition: {x: 0.5, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -340,9 +340,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c65b9000fd22834091e86f86798f0a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  HPbar: {fileID: 5511874059705932630}
+  maxHP: 100
   manaDiamonds: []
   manaBar: {fileID: 0}
-  HPbar: {fileID: 5511874059705932630}
 --- !u!1 &3789586817868648292
 GameObject:
   m_ObjectHideFlags: 0
@@ -510,6 +511,7 @@ MonoBehaviour:
   isLocal: 0
   groundDetect: {fileID: 4542395017445493030}
   hpScript: {fileID: 4542395017445493031}
+  hurtbox: {fileID: 4542395017445493084}
   uiHandler: {fileID: 6535305582354604888}
   audio: {fileID: 3243769594574893021}
   trfm: {fileID: 4542395017445493057}
@@ -525,8 +527,9 @@ MonoBehaviour:
   slashHitbox: {fileID: 2249793742250614069}
   activeClone: {fileID: 0}
   slashScale: 0
-  swordObj: {fileID: 0}
-  headObj: {fileID: 0}
+  swordObj: {fileID: 8028334190290156438}
+  headObj: {fileID: 1831623192019239065}
+  UIObj: {fileID: 2133908926491792016}
   yMouse: 0
   xMouse: 0
   targetYRot: 0
@@ -822,6 +825,7 @@ MonoBehaviour:
   damageSFX: {fileID: 1588744626275184836}
   deathFX: {fileID: 1389547146917376004, guid: 2942b77dd24678841b256b14c0d7ddb4, type: 3}
   useDefaultBehavior: 1
+  uiHandler: {fileID: 0}
   dontSync: 0
   rootObj: {fileID: 0}
   attackIDPtr: 0
@@ -1251,8 +1255,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5046897660877350428}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.7, y: 0, z: 0}
-  m_LocalScale: {x: 0.25, y: 0.049999993, z: 1}
+  m_LocalPosition: {x: -0.5, y: 0, z: 0}
+  m_LocalScale: {x: 0.24999996, y: 0.049999993, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5511874059705932630}
@@ -1528,5 +1532,10 @@ PrefabInstance:
 --- !u!4 &7215206151693951276 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f95eb5ec17bd00649a575a9d05ede1b1, type: 3}
+  m_PrefabInstance: {fileID: 7181894199410886343}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &8028334190290156438 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: f95eb5ec17bd00649a575a9d05ede1b1, type: 3}
   m_PrefabInstance: {fileID: 7181894199410886343}
   m_PrefabAsset: {fileID: 0}

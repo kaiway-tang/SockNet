@@ -19,6 +19,7 @@ public class PlayerController : NetworkObject
 
     [SerializeField] GroundDetect groundDetect;
     [SerializeField] HPEntity hpScript;
+    [SerializeField] Collider hurtbox;
     bool dead, invuln;
 
     [SerializeField] PlayerUIHandler uiHandler;
@@ -95,6 +96,16 @@ public class PlayerController : NetworkObject
 
     void HandleTimers()
     {
+        if (vanishInvuln > 0)
+        {
+            vanishInvuln -= Time.deltaTime;
+            if (vanishInvuln <= 0)
+            {
+                EnableHurtbox(true);
+                vanishInvuln = 0;
+            }
+        }
+
         if (slashTimer > 0)
         {
             slashTimer -= Time.deltaTime;
@@ -166,6 +177,9 @@ public class PlayerController : NetworkObject
     int mana;
 
     float slashTimer, slashRayDist;
+    float vanishInvuln;
+
+    int disableHurtbox;
 
     bool vanished;
 
@@ -214,7 +228,7 @@ public class PlayerController : NetworkObject
                 AddMana(-200);
                 buffer4[FUNCTION_ID] = VANISH_UPDATE;
                 buffer4[3] = 1;
-                //NetworkManager.Send(buffer4);
+                NetworkManager.Send(buffer4);
             }
             if (Input.GetKeyDown(KeyCode.M))
             {
@@ -252,10 +266,11 @@ public class PlayerController : NetworkObject
 
     [SerializeField] GameObject swordObj;
     [SerializeField] GameObject headObj;
+    [SerializeField] GameObject UIObj;
     void CastVanish()
     {
-        activeClone = Instantiate(clone, trfm.position, trfm.rotation).GetComponent<Clone>();
-        activeClone.Init(playerTrfm.position);
+        activeClone = Instantiate(clone, trfm.position, playerTrfm.rotation).GetComponent<Clone>();
+        activeClone.Init(playerTrfm.position, hpScript.HP, camTrfm.rotation, swordTrfm, sincycle);
 
         targetTrfm = activeClone.transform;
 
@@ -267,7 +282,11 @@ public class PlayerController : NetworkObject
         {
             swordObj.SetActive(false);
             headObj.SetActive(false);
-        }        
+            UIObj.SetActive(false);
+        }
+
+        EnableHurtbox(false);
+        vanishInvuln = 0.5f;
 
         vanished = true;
     }
@@ -284,6 +303,7 @@ public class PlayerController : NetworkObject
         {
             swordObj.SetActive(true);
             headObj.SetActive(true);
+            UIObj.SetActive(true);
         }
 
         for (int i = 0; i < playerMeshes.Length; i++)
@@ -291,11 +311,36 @@ public class PlayerController : NetworkObject
             playerMeshes[i].enabled = true;
         }
 
+        if (vanishInvuln > 0)
+        {
+            EnableHurtbox(true);
+            vanishInvuln = 0;
+        }        
+
         targetTrfm = trfm;
 
-        activeClone.End();
+        if (activeClone) { activeClone.End(); }        
         vanished = false;
     }
+
+    void EnableHurtbox(bool enable)
+    {
+        if (enable)
+        {
+            disableHurtbox--;
+            if (disableHurtbox < 1)
+            {
+                disableHurtbox = 0;
+                hurtbox.enabled = true;
+            }
+        }
+        else
+        {
+            disableHurtbox++;
+            hurtbox.enabled = false;
+        }
+    }
+
     #endregion
 
     #region NETWORKING
@@ -311,6 +356,7 @@ public class PlayerController : NetworkObject
 
         if (isLocal)
         {
+            NetworkManager.SetBufferUShort(buffer20, playerObjID);
             NetworkManager.SetBufferUShort(buffer16, playerObjID);
             NetworkManager.SetBufferUShort(buffer6, playerObjID);
             NetworkManager.SetBufferUShort(buffer4, playerObjID);
@@ -593,6 +639,11 @@ public class PlayerController : NetworkObject
 
         if (vanished)
         {
+            if (!activeClone)
+            {
+                EndVanish();
+            }
+
             AddMana(-2);
             if (mana < 1 && isLocal)
             {

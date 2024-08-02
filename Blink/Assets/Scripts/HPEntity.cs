@@ -15,6 +15,8 @@ public class HPEntity : MonoBehaviour
 
     public bool useDefaultBehavior = true;
 
+    [SerializeField] UIHandler uiHandler;
+
     [SerializeField] bool dontSync;
     [SerializeField] GameObject rootObj;    
 
@@ -44,7 +46,7 @@ public class HPEntity : MonoBehaviour
         OnDamage?.Invoke(amount, sourceID);
 
         if (useDefaultBehavior)
-        {
+        {   
             HP -= amount;
             if (HP < 0.01)
             {
@@ -56,6 +58,7 @@ public class HPEntity : MonoBehaviour
             {
                 damageSFX.Play();
                 damageFX.Play();
+                if (uiHandler) { uiHandler.SetHP(HP); }
             }
         }
 

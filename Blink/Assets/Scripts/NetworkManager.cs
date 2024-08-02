@@ -247,15 +247,15 @@ public class NetworkManager : MonoBehaviour
         await Receive();
     }
 
+    byte[] _buffer = new byte[20];
     private async Task Receive()
     {
-        var buffer = new byte[16];
         while (webSocket.State == WebSocketState.Open)
         {
             WebSocketReceiveResult result = null;
             try
             {
-                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellation.Token);
+                result = await webSocket.ReceiveAsync(new ArraySegment<byte>(_buffer), cancellation.Token);
             }
             catch (Exception e)
             {
@@ -272,13 +272,13 @@ public class NetworkManager : MonoBehaviour
             {
                 //var receivedData = ConvertArraySegmentToByteArray(new ArraySegment<byte>(buffer, 0, result.Count));
 
-                if (buffer[1] == 0 && buffer[0] == 0)
+                if (_buffer[1] == 0 && _buffer[0] == 0)
                 {
-                    ResolveServerMessage(buffer);
+                    ResolveServerMessage(_buffer);
                 }
                 else
                 {
-                    ProcessUpdate(buffer);
+                    ProcessUpdate(_buffer);
                 }
             }
         }

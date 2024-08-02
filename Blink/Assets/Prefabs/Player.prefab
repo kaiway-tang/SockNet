@@ -539,6 +539,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c65b9000fd22834091e86f86798f0a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  HPbar: {fileID: 7328642829830753917}
+  maxHP: 100
   manaDiamonds:
   - {fileID: 8953237016314083501}
   - {fileID: 193768002105602568}
@@ -546,7 +548,6 @@ MonoBehaviour:
   - {fileID: 7426522611387737862}
   - {fileID: 979946916503692020}
   manaBar: {fileID: 2861623369408309194}
-  HPbar: {fileID: 7328642829830753917}
 --- !u!1 &5575635997332525958
 GameObject:
   m_ObjectHideFlags: 0
