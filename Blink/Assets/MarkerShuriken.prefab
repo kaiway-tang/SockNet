@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 8174353968033862108}
   - component: {fileID: 5383312658929941416}
   m_Layer: 7
-  m_Name: Shuriken
+  m_Name: MarkerShuriken
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -51,9 +51,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ownerID: 0
   teamID: 0
-  damage: 20
+  damage: 0
   syncMethod: 0
   eventID: 0
+  isMarker: 1
   trail: {fileID: 3416413821850582629}
   speed: 60
   modelTrfm: {fileID: 4674890376730661851}

@@ -11,11 +11,10 @@ public class Shuriken : Projectile
     [SerializeField] AudioSource embed;
 
     bool init = false;
-    bool damageDealt;
 
-    public override void Init(ushort ownerID, float timeDelta, byte pSyncMethod = HPEntity.DONT_SYNC, uint pEventID = 0)
+    public override void Init(ushort ownerID, ushort pTeamID, float timeDelta, byte pSyncMethod = HPEntity.DONT_SYNC, uint pEventID = 0)
     {        
-        base.Init(ownerID, timeDelta, pSyncMethod, pEventID);
+        base.Init(ownerID, pTeamID, timeDelta, pSyncMethod, pEventID);
         trfm.position += trfm.forward * speed * timeDelta;
         rb.velocity = trfm.forward * speed;
         init = true;
@@ -35,14 +34,13 @@ public class Shuriken : Projectile
     HPEntity target;
     private void OnTriggerEnter(Collider other)
     {
-        if (!init || damageDealt) { return; }
+        if (!init) { return; }
         if (other.gameObject.layer == 6)
         {
             target = other.gameObject.GetComponent<HPEntity>();
-            if (target.objID != ownerID || ownerID == 0)
+            if (target.ValidTarget(ownerID, teamID))
             {
-                damageDealt = true;
-                target.TakeDamage(damage, ownerID, syncMethod, eventID);
+                target.TakeDamage(damage, ownerID, teamID, syncMethod, eventID);
             }
             else
             {
@@ -68,7 +66,7 @@ public class Shuriken : Projectile
         embed.Play();
         trail.Stop();
         trail.transform.parent = null;
-        Destroy(trail.gameObject, 3);
+        Destroy(trail.gameObject, 5);
         if (leaveShuriken) { modelTrfm.parent = null; }        
         Destroy(gameObject);
     }

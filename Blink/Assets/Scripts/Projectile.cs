@@ -5,18 +5,23 @@ using UnityEngine;
 public class Projectile : MonoBehaviour
 {
     protected Transform trfm;
-    public ushort ownerID;
+    public ushort ownerID, teamID;
     [SerializeField] protected ushort damage;
 
     [SerializeField] protected byte syncMethod;
     [SerializeField] protected uint eventID;
-    public virtual void Init(ushort pOwnerID, float timeDelta, byte pSyncMethod = HPEntity.DONT_SYNC, uint pEventID = 0)
+    [SerializeField] bool isMarker;
+    public virtual void Init(ushort pOwnerID, ushort pTeamID, float timeDelta, byte pSyncMethod = HPEntity.DONT_SYNC, uint pEventID = 0)
     {
         Invoke("End", 5);
         trfm = transform;
         ownerID = pOwnerID;
-        syncMethod = pSyncMethod;
-        eventID = pEventID;
+        teamID = pTeamID;
+        if (isMarker) { syncMethod = HPEntity.DONT_SYNC; }
+        else { syncMethod = pSyncMethod; }
+
+        if (syncMethod == HPEntity.DONT_SYNC || pEventID == 0) { eventID = Tools.RandomEventID(); }
+        else { eventID = pEventID; }
     }    
 
     protected virtual void End() { }

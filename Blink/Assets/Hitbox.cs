@@ -6,12 +6,12 @@ public class Hitbox : MonoBehaviour
 {
     [SerializeField] ushort damage;
     [SerializeField] byte syncMethod;
-    [SerializeField] ushort ownerID;
-    [SerializeField] Collider col;
+    [SerializeField] ushort ownerID, teamID;
+    public Collider col;
     [SerializeField] uint eventID;
     public Transform trfm;
 
-    public void Init(ushort pOwnerID, bool isLocal = false)
+    public void Init(ushort pOwnerID)
     {
         ownerID = pOwnerID;
         trfm = transform;
@@ -36,9 +36,9 @@ public class Hitbox : MonoBehaviour
         if (other.gameObject.layer == 6)
         {
             target = other.GetComponent<HPEntity>();
-            if (target.objID != ownerID || ownerID == 0)
+            if (target.ValidTarget(ownerID, teamID))
             {
-                target.TakeDamage(damage, ownerID, syncMethod, eventID);
+                target.TakeDamage(damage, ownerID, teamID, syncMethod, eventID);
             }
         }
     }

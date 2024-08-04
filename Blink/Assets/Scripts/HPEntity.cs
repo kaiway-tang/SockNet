@@ -6,6 +6,8 @@ public class HPEntity : MonoBehaviour
 {
     public int HP;
     public ushort objID;
+    public ushort teamID;
+    public const int TEAM_NONE = 0;
 
     public ParticleSystem damageFX;
     public AudioSource damageSFX;
@@ -18,7 +20,7 @@ public class HPEntity : MonoBehaviour
     [SerializeField] UIHandler uiHandler;
 
     [SerializeField] bool dontSync;
-    [SerializeField] GameObject rootObj;    
+    [SerializeField] GameObject[] objs;  
 
     protected void Start()
     {
@@ -33,36 +35,52 @@ public class HPEntity : MonoBehaviour
     {
         if (!ValidEventID(eventID)) { return; }
         HP += amount;
+        SyncHP(syncMethod);
     }
 
     public const byte DONT_SYNC = 0, SYNC_HP = 1, SYNC_DMG = 2;
     ushort lastDamageAmount;
-    public void TakeDamage(ushort amount, ushort sourceID, byte syncMethod = DONT_SYNC, uint eventID = 0)
+    public void TakeDamage(ushort amount, ushort sourceID, ushort teamID = 0, byte syncMethod = DONT_SYNC, uint eventID = 0)
     {
         if (!ValidEventID(eventID)) { return; }
+        if (amount < 1) { return; }        
 
         lastDamageAmount = amount;
 
-        OnDamage?.Invoke(amount, sourceID);
-
         if (useDefaultBehavior)
-        {   
-            HP -= amount;
-            if (HP < 0.01)
-            {
-                HP = 0;
-                if (syncMethod > 0) { SyncHP(syncMethod); }
-                End();
-            }
-            else
-            {
-                damageSFX.Play();
-                damageFX.Play();
-                if (uiHandler) { uiHandler.SetHP(HP); }
-            }
+        {
+            DefaultDamageBehavior(amount, sourceID, teamID, syncMethod, eventID);
         }
 
+        OnDamage?.Invoke(amount, sourceID);
+
         if (syncMethod > 0) { SyncHP(syncMethod); }
+    }
+
+    public void DefaultDamageBehavior(ushort amount, ushort sourceID, ushort teamID = 0, byte syncMethod = DONT_SYNC, uint eventID = 0)
+    {
+        HP -= amount;
+        if (HP < 0.01)
+        {
+            HP = 0;
+            if (syncMethod > 0) { SyncHP(syncMethod); }
+            End();
+        }
+        else
+        {
+            damageSFX.Play();
+            damageFX.Play();
+            if (uiHandler) { uiHandler.SetHP(HP); }
+        }
+    }
+
+    public bool ValidTarget(ushort sourceID, ushort pTeamID)
+    {
+        //note: wrong
+
+        if (sourceID != 0 && sourceID == objID) { return false; }
+        if (pTeamID != 0 && pTeamID == teamID) { return false; }
+        return true;
     }
 
     [SerializeField] int attackIDPtr;
@@ -77,23 +95,34 @@ public class HPEntity : MonoBehaviour
             if (lastEventIDs[i] == ID) { return false; }
         }
 
+        CacheEventID(ID);
+        return true;
+    }
+
+    void CacheEventID(uint ID)
+    {
         lastEventID = ID;
         lastEventIDs[attackIDPtr] = ID;
         attackIDPtr = (attackIDPtr + 1) % lastEventIDs.Length;
-        return true;
     }
 
     public void End()
     {
         if (deathFX) { Instantiate(deathFX, transform.position, Quaternion.identity); }
 
-        if (rootObj) { Destroy(rootObj); }
+        if (objs.Length > 0) {
+            for (int i = 0; i < objs.Length; i++)
+            {
+                Destroy(objs[i]);
+            }
+        }
         else { Destroy(gameObject); }
     }
 
     byte[] HPBuffer;
-    public void SyncHP(byte syncMethod = 1)
+    public void SyncHP(byte syncMethod = 1, uint eventIDOverride = 0)
     {
+        if (eventIDOverride > 0) { CacheEventID(eventIDOverride); }
         if (dontSync) { return; }
         HPBuffer[3] = (byte)(syncMethod - 1);
         NetworkManager.SetBufferUInt(HPBuffer, lastEventID, 6);
@@ -119,14 +148,14 @@ public class HPEntity : MonoBehaviour
 
         if (buffer[3] == 1)
         {
-            Debug.Log("Took " + hpUpdate + " virtual damage");
-            TakeDamage(hpUpdate, 0, DONT_SYNC, eventIDUpdate);
+            TakeDamage(hpUpdate, 0, TEAM_NONE, DONT_SYNC, eventIDUpdate);
         }
         else
         {
             if (hpUpdate < HP)
             {
-                TakeDamage((ushort)(HP - hpUpdate), 0, DONT_SYNC, eventIDUpdate);
+                Debug.Log("New: " + hpUpdate + " from: " + HP);
+                TakeDamage((ushort)(HP - hpUpdate), 0, TEAM_NONE, DONT_SYNC, eventIDUpdate);
             }
             else if (hpUpdate > HP)
             {

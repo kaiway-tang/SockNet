@@ -118,13 +118,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HP: 100
   objID: 0
+  teamID: 0
   damageFX: {fileID: 7054499373918468803}
   damageSFX: {fileID: 7761721946309950884}
   deathFX: {fileID: 561735546950010099, guid: ab8340135a260da449b3bafba963e2f0, type: 3}
   useDefaultBehavior: 1
   uiHandler: {fileID: 4853878794084978025}
   dontSync: 0
-  rootObj: {fileID: 2989247974696865925}
+  objs:
+  - {fileID: 2989247974696865925}
+  - {fileID: 272122819023315164}
   attackIDPtr: 0
   lastEventID: 0
   lastEventIDs: 

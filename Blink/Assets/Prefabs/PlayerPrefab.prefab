@@ -162,6 +162,7 @@ MonoBehaviour:
   damage: 80
   syncMethod: 1
   ownerID: 0
+  teamID: 0
   col: {fileID: 1306576350343152263}
   eventID: 0
   trfm: {fileID: 4419293627088661945}
@@ -328,6 +329,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66550da5ecd238c4db60fb5ee40a425a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  trfm: {fileID: 0}
 --- !u!114 &6535305582354604888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -513,12 +515,13 @@ MonoBehaviour:
   hpScript: {fileID: 4542395017445493031}
   hurtbox: {fileID: 4542395017445493084}
   uiHandler: {fileID: 6535305582354604888}
-  audio: {fileID: 3243769594574893021}
+  playerAudio: {fileID: 3243769594574893021}
   trfm: {fileID: 4542395017445493057}
   targetTrfm: {fileID: 0}
+  posTracker: {fileID: 6134511519106156395}
   dashDistance: 14
   projectiles:
-  - {fileID: 201928810244430043, guid: 2c2f859646ff2074ca8ee8053ea2bce6, type: 3}
+  - {fileID: 201928810244430043, guid: 2af2571fd9d2bef418c2a04a0e256f8c, type: 3}
   clone: {fileID: 2989247974696865925, guid: a04bd8f7d4e1f3645822ab4a1e8a063d, type: 3}
   playerMeshes:
   - {fileID: 4542395017445493069}
@@ -526,12 +529,17 @@ MonoBehaviour:
   slashFX: {fileID: 8594647423510296702}
   slashHitbox: {fileID: 2249793742250614069}
   activeClone: {fileID: 0}
-  slashScale: 0
+  slashScale: 1
   swordObj: {fileID: 8028334190290156438}
   headObj: {fileID: 1831623192019239065}
   UIObj: {fileID: 2133908926491792016}
   yMouse: 0
   xMouse: 0
+  endText: {fileID: 0}
+  winText: {fileID: 21300000, guid: 305c8847dacc0fc418c8d03ec27e86a2, type: 3}
+  loseText: {fileID: 0}
+  gamemode: 0
+  doppels: []
   targetYRot: 0
   targetXRot: 0
   tmp: {fileID: 0}
@@ -710,6 +718,7 @@ GameObject:
   - component: {fileID: 4542395017445493073}
   - component: {fileID: 4542395017445493069}
   - component: {fileID: 4542395017445493084}
+  - component: {fileID: 6134511519106156395}
   - component: {fileID: 4542395017445493031}
   - component: {fileID: 3243769594574893021}
   - component: {fileID: 7615507086219295842}
@@ -807,6 +816,20 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &6134511519106156395
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4542395017445493119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7cf3cdcf041e244e814d7e079686cd2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trfm: {fileID: 4542395017445493062}
+  cachedPositions: []
 --- !u!114 &4542395017445493031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -821,13 +844,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HP: 100
   objID: 0
+  teamID: 0
   damageFX: {fileID: 8915322534286773560}
   damageSFX: {fileID: 1588744626275184836}
   deathFX: {fileID: 1389547146917376004, guid: 2942b77dd24678841b256b14c0d7ddb4, type: 3}
-  useDefaultBehavior: 1
+  useDefaultBehavior: 0
   uiHandler: {fileID: 0}
   dontSync: 0
-  rootObj: {fileID: 0}
+  objs: []
   attackIDPtr: 0
   lastEventID: 0
   lastEventIDs: 
@@ -858,7 +882,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: c3b65b87c3f65854cbe9e693a0533f9e, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.4
+  m_Volume: 0.5
   m_Pitch: 1
   Loop: 1
   Mute: 0

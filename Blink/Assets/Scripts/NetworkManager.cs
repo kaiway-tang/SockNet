@@ -12,7 +12,7 @@ using TMPro;
 
 public class NetworkManager : MonoBehaviour
 {
-    static NetworkManager self;
+    public static NetworkManager self;
     [SerializeField] TextMeshProUGUI tmp;
 
     [SerializeField] GameObject cubeFlashInd;
@@ -22,7 +22,7 @@ public class NetworkManager : MonoBehaviour
     public GameObject[] networkPrefabs;
 
     public static Dictionary<ushort, NetworkObject> networkObjects = new Dictionary<ushort, NetworkObject>();
-    public static List<PlayerController> players = new List<PlayerController>();
+    public static Dictionary<ushort, PlayerController> players = new Dictionary<ushort, PlayerController>();
 
     public static float time;
 
@@ -74,6 +74,8 @@ public class NetworkManager : MonoBehaviour
 
     private void Start()
     {        
+        if (connected) { return; }
+
         if (isWebGL)
         {
             WebGL_Start("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
@@ -367,6 +369,12 @@ public class NetworkManager : MonoBehaviour
     }
 
     static NetworkObject newNetObj;
+
+    public delegate void OnJoinDelegate(ushort objID);
+    public event OnJoinDelegate OnJoin;
+
+    public delegate void JoinTeamDelegate(ushort objID, ushort teamID);
+    public event JoinTeamDelegate JoinTeam;
     static void ResolveNetObjInit(byte[] buffer)
     {
         ushort param_ID = GetBufferUShort(buffer, 3);        
@@ -387,7 +395,8 @@ public class NetworkManager : MonoBehaviour
 
                 if (param_ID - 1024 == 0)
                 {
-                    players.Add(newNetObj.GetComponent<PlayerController>());
+                    players.Add(newNetObj.objID, newNetObj.GetComponent<PlayerController>());
+                    self.OnJoin?.Invoke(newNetObj.objID);
                 }
             }            
         }

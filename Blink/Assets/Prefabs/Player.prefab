@@ -32,6 +32,7 @@ Transform:
   - {fileID: 7328642829830753917}
   - {fileID: 5500942227319088815}
   - {fileID: 7351884886221108250}
+  - {fileID: 2570202009719818994}
   m_Father: {fileID: 298360833968741959}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -73,6 +74,90 @@ Transform:
   m_Father: {fileID: 3541316081564520096}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1430646036036553863
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2570202009719818994}
+  - component: {fileID: 8692990168372948135}
+  m_Layer: 0
+  m_Name: endGameText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2570202009719818994
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1430646036036553863}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 10, z: 0.1}
+  m_LocalScale: {x: 8, y: 8, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3541316081564520096}
+  m_RootOrder: 4
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &8692990168372948135
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1430646036036553863}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 12.8, y: 7.2}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 0
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
 --- !u!1 &1697403277939993080
 GameObject:
   m_ObjectHideFlags: 0
@@ -1325,9 +1410,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
+      propertyPath: endText
+      value: 
+      objectReference: {fileID: 8692990168372948135}
+    - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
       propertyPath: isLocal
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
+      propertyPath: winText
+      value: 
+      objectReference: {fileID: 21300000, guid: 305c8847dacc0fc418c8d03ec27e86a2, type: 3}
+    - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
+      propertyPath: loseText
+      value: 
+      objectReference: {fileID: 21300000, guid: e7854702e9f43864fb283954671e930c, type: 3}
     - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
       propertyPath: uiHandler
       value: 
@@ -1336,6 +1433,10 @@ PrefabInstance:
       propertyPath: swordSlashPos
       value: 
       objectReference: {fileID: 7691060298000960944}
+    - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
+      propertyPath: projectiles.Array.data[0]
+      value: 
+      objectReference: {fileID: 201928810244430043, guid: 2c2f859646ff2074ca8ee8053ea2bce6, type: 3}
     - target: {fileID: 4542395017445493029, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
       propertyPath: swordPositions.Array.size
       value: 2

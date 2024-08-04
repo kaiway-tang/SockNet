@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
+using UnityEngine.SceneManagement;
+
 public class PlayerController : NetworkObject
 {
     [SerializeField] float speed;
@@ -23,13 +25,14 @@ public class PlayerController : NetworkObject
     bool dead, invuln;
 
     [SerializeField] PlayerUIHandler uiHandler;
-    public static ushort playerObjID;
+    public static ushort playerObjID, teamID;
 
-    [SerializeField] PlayerAudio audio;
+    [SerializeField] PlayerAudio playerAudio;
 
     public static PlayerController self;
     public Transform trfm;
     public Transform targetTrfm;
+    public PositionTracker posTracker;
 
     private void Awake()
     {
@@ -47,9 +50,9 @@ public class PlayerController : NetworkObject
         hpScript.useDefaultBehavior = false;
         playerTrfm.parent = null;
         SetMana(100);
-        playerObjID = objID;
+        //playerObjID = objID;
         hpScript.objID = objID;
-        slashHitbox.Init(objID, isLocal);
+        slashHitbox.Init(objID);
 
         if (isLocal)
         {
@@ -59,7 +62,7 @@ public class PlayerController : NetworkObject
             buffer6 = new byte[6];
             buffer4 = new byte[4];
 
-            NetworkManager.InitializeNetObj(self, 0);
+            if (playerObjID < 64) { NetworkManager.InitializeNetObj(self, 0); }            
 
             Cursor.visible = false;
             Cursor.lockState = CursorLockMode.Locked;
@@ -72,7 +75,6 @@ public class PlayerController : NetworkObject
     {
         if (dead)
         {
-            Respawn();
             return;
         }
 
@@ -86,6 +88,7 @@ public class PlayerController : NetworkObject
 
             HandleRotationInput();
             HandleAbilities();
+            HandleDoppelSwap();
         }
 
         HandleTimers();
@@ -110,6 +113,10 @@ public class PlayerController : NetworkObject
         {
             slashTimer -= Time.deltaTime;
             rb.velocity = Vector3.zero;
+            if (slashHitbox.col.enabled && slashTimer < 0.1f)
+            {
+                slashHitbox.Deactivate();
+            }
             if (slashTimer <= 0)
             {
                 if (isLocal)
@@ -118,8 +125,12 @@ public class PlayerController : NetworkObject
                     swordTrfm.rotation = swordPositions[0].rotation;
                 }                
                 slashFX.Stop();
-                slashHitbox.Deactivate();
             }
+        }
+
+        if (doppelSwapCD > 0)
+        {
+            doppelSwapCD--;
         }
     }
 
@@ -151,7 +162,7 @@ public class PlayerController : NetworkObject
             buffer6[5] = 1;
         }
 
-        buffer6[2] = 4;
+        buffer6[FUNCTION_ID] = JUMP_UPDATE;
         NetworkManager.SetBufferTime(buffer6, 3);
         NetworkManager.Send(buffer6);
     }
@@ -190,20 +201,6 @@ public class PlayerController : NetworkObject
         {
             if (Input.GetMouseButtonDown(0))
             {
-                if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.terrainMask))
-                {
-                    slashVect = rayHit.point;
-                    slashRayDist = rayHit.distance;
-                }
-                else
-                {
-                    slashVect = camTrfm.position + camTrfm.forward * dashDistance;
-                    slashRayDist = dashDistance;
-                }
-                
-                transform.position = playerTrfm.position + camTrfm.forward * (slashRayDist - 2) + Vector3.up * 1f;
-                SendTrfm();
-
                 AddMana(-200);
 
                 uint eventID = Tools.RandomEventID();
@@ -217,8 +214,8 @@ public class PlayerController : NetworkObject
             {
                 uint eventID = Tools.RandomEventID();
                 Instantiate(projectiles[projectileType], firePoint.position, firePoint.rotation)
-                    .GetComponent<Projectile>().Init(objID, 0, HPEntity.SYNC_HP, eventID);
-                audio.PlayShurikenThrow();
+                    .GetComponent<Projectile>().Init(objID, teamID, 0, HPEntity.SYNC_HP, eventID);
+                playerAudio.PlayShurikenThrow();
                 SendProjectileAction(eventID);
                 AddMana(-200);
             }
@@ -251,6 +248,20 @@ public class PlayerController : NetworkObject
             swordTrfm.rotation = swordPositions[1].rotation;
         }
 
+        if (Physics.Raycast(camTrfm.position, camTrfm.forward, out rayHit, dashDistance, Tools.terrainMask))
+        {
+            slashVect = rayHit.point;
+            slashRayDist = rayHit.distance;
+        }
+        else
+        {
+            slashVect = camTrfm.position + camTrfm.forward * dashDistance;
+            slashRayDist = dashDistance;
+        }
+        
+        transform.position = playerTrfm.position + camTrfm.forward * (slashRayDist - 2) + Vector3.up * 1f;
+        if (isLocal) { SendTrfm(); }
+
         slashHitbox.trfm.position = (slashVect + playerTrfm.position) / 2f;
         slashHitbox.trfm.rotation = camTrfm.rotation;
 
@@ -259,7 +270,7 @@ public class PlayerController : NetworkObject
         slashHitbox.trfm.localScale = slashVect;
         slashHitbox.Activate(eventID);
 
-        audio.PlaySlash();
+        playerAudio.PlaySlash();
         slashFX.Play();
         slashTimer = 0.3f;
     }
@@ -273,6 +284,7 @@ public class PlayerController : NetworkObject
         activeClone.Init(playerTrfm.position, hpScript.HP, camTrfm.rotation, swordTrfm, sincycle);
 
         targetTrfm = activeClone.transform;
+        posTracker.trfm = activeClone.transform;
 
         for (int i = 0; i < playerMeshes.Length; i++)
         {
@@ -311,13 +323,14 @@ public class PlayerController : NetworkObject
             playerMeshes[i].enabled = true;
         }
 
-        if (vanishInvuln > 0)
+        if (vanishInvuln > 0.25f)
         {
             EnableHurtbox(true);
-            vanishInvuln = 0;
+            vanishInvuln = 0.25f;
         }        
 
         targetTrfm = trfm;
+        posTracker.trfm = trfm;
 
         if (activeClone) { activeClone.End(); }        
         vanished = false;
@@ -349,18 +362,30 @@ public class PlayerController : NetworkObject
     {
         base.AssignObjID(ID);
 
-        if (isLocal) { playerObjID = ID; }        
+        if (isLocal)
+        {
+            playerObjID = ID;
+            NetworkManager.players.Add(ID, GetComponent<PlayerController>());
+        }        
         hpScript.objID = ID;
-        slashHitbox.Init(ID, isLocal);
+        slashHitbox.Init(ID);
         //Debug.Log("player received ID: " + ID);
 
         if (isLocal)
         {
             NetworkManager.SetBufferUShort(buffer20, playerObjID);
             NetworkManager.SetBufferUShort(buffer16, playerObjID);
+            NetworkManager.SetBufferUShort(buffer7, playerObjID);
             NetworkManager.SetBufferUShort(buffer6, playerObjID);
             NetworkManager.SetBufferUShort(buffer4, playerObjID);
         }        
+    }
+
+    public void AssignTeam(ushort pTeamID)
+    {
+        //buffer6[FUNCTION_ID] = TEAM_UPDATE;
+        //NetworkManager.SetBufferUShort(buffer6, pTeamID, 3);
+        //NetworkManager.Send(buffer6);
     }
 
     public override void OnDcd()
@@ -376,14 +401,14 @@ public class PlayerController : NetworkObject
     byte[] buffer20; //projectiles
     byte[] buffer16; //trfm
     byte[] buffer7; //cast slash
-    byte[] buffer6; //jump
+    byte[] buffer6; //jump, set team
     byte[] buffer4; //vanish
 
     public void SendProjectileAction(uint eventID)
     {
         if (!IsConnected()) { return; }
 
-        buffer20[2] = 1;
+        buffer20[FUNCTION_ID] = PROJECTILE_UPDATE;
         buffer20[3] = projectileType;
         NetworkManager.SetBufferTime(buffer20, 4);
         NetworkManager.SetBufferCoords(buffer20, playerTrfm.position, 6);
@@ -419,7 +444,8 @@ public class PlayerController : NetworkObject
     }
 
     const int FUNCTION_ID = 2;
-    const int TRFM_UPDATE = 0, PROJECTILE_UPDATE = 1, VANISH_UPDATE = 2, SLASH_UPDATE = 3, JUMP_UPDATE = 4, HP_UPDATE = 223;
+    const int TRFM_UPDATE = 0, PROJECTILE_UPDATE = 1, VANISH_UPDATE = 2, SLASH_UPDATE = 3, JUMP_UPDATE = 4, 
+        TEAM_UPDATE = 5, HP_UPDATE = 223;
     public override void NetworkUpdate(byte[] buffer)
     {        
         if (buffer[FUNCTION_ID] == HP_UPDATE)
@@ -427,19 +453,17 @@ public class PlayerController : NetworkObject
             hpScript.HandleSync(buffer);
         }
 
-        if (isLocal) return;
-
         if (buffer[FUNCTION_ID] == TRFM_UPDATE) { HandleTrfmUpdate(buffer); }
 
         else if (buffer[FUNCTION_ID] == PROJECTILE_UPDATE)
         {
             AddMana(-200);
-            audio.PlayShurikenThrow();
+            playerAudio.PlayShurikenThrow();
             playerTrfm.position = NetworkManager.GetBufferCoords(buffer, 6);
             SetRotation(NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 14)), NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 12)));
 
             Instantiate(projectiles[buffer[3]], firePoint.position, firePoint.rotation)
-                .GetComponent<Projectile>().Init(objID, NetworkManager.GetBufferDelta(buffer, 4), HPEntity.DONT_SYNC, NetworkManager.GetBufferUInt(buffer, 16));
+                .GetComponent<Projectile>().Init(objID, teamID, NetworkManager.GetBufferDelta(buffer, 4), HPEntity.DONT_SYNC, NetworkManager.GetBufferUInt(buffer, 16));
         }
 
         else if (buffer[FUNCTION_ID] == VANISH_UPDATE)
@@ -449,7 +473,9 @@ public class PlayerController : NetworkObject
             else { EndVanish(); }
         }
 
-        else if (buffer[FUNCTION_ID] == SLASH_UPDATE) { CastSlash(NetworkManager.GetBufferUInt(buffer, 3)); }
+        else if (buffer[FUNCTION_ID] == SLASH_UPDATE) {
+            CastSlash(NetworkManager.GetBufferUInt(buffer, 3));
+        }
 
         else if (buffer[FUNCTION_ID] == JUMP_UPDATE)
         {
@@ -463,6 +489,11 @@ public class PlayerController : NetworkObject
             }
             rb.velocity = velocityVect;
         } 
+
+        else if (buffer[FUNCTION_ID] == TEAM_UPDATE)
+        {
+            teamID = NetworkManager.GetBufferUShort(buffer, 3);
+        }
     }
 
     void HandleTrfmUpdate(byte[] buffer)
@@ -475,6 +506,8 @@ public class PlayerController : NetworkObject
         keyBack = ((buffer[15] >> 2) & 0x01) == 1;
         keyLeft = ((buffer[15] >> 1) & 0x01) == 1;
         keyRight = (buffer[15] & 0x01) == 1;
+
+        anyMovementKey = keyFwd || keyBack || keyLeft || keyRight;
 
         Update();
 
@@ -608,9 +641,11 @@ public class PlayerController : NetworkObject
         calcHP = hpScript.HP - amount;
 
         if (calcHP < 0.01)
-        {
+        {            
+            Debug.Log("lethal");
             SetHP(0);
-            dead = true;
+            hpScript.SyncHP(HPEntity.SYNC_HP, Tools.RandomEventID());
+            HandleDeath();
         }
         else
         {
@@ -618,7 +653,87 @@ public class PlayerController : NetworkObject
         }
     }
 
+    [SerializeField] SpriteRenderer endText;
+    [SerializeField] Sprite winText, loseText;
+    public int gamemode;
+    public const int GM_FFA = 0, GM_TDM = 1;
+    void HandleDeath()
+    {
+        if (gamemode == GM_FFA)
+        {
+            SceneManager.LoadScene("FFA");
+            Respawn();
+        }
+        if (gamemode == GM_TDM)
+        {
+            dead = true;
+            for (int i = 0; i < doppels.Length; i++)
+            {
+                if (doppels[i])
+                {
+                    SetHP(doppels[i].hpScript.HP);
+                    DoppelSwap(i);
+                    doppels[i].hpScript.TakeDamage(9999, 0, 0, HPEntity.SYNC_HP, Tools.RandomEventID());
+                    doppels[i].hpScript.End();
+                    dead = false;
+                    break;
+                }
+            }
+            
+            if (dead)
+            {
+                if (isLocal)
+                {
+                    endText.sprite = loseText;
+                }
+                else
+                {
+                    self.endText.sprite = winText;
+                }
+                Respawn();
+            }
+        }
+    }
+
     #endregion
+
+    #region DOPPELS
+
+    public static List<PositionTracker> opponents = new List<PositionTracker>();
+    [SerializeField] Doppel[] doppels;
+
+    float doppelSwapCD;
+    Vector3 doppelDest;
+
+    public void AssignDoppels(Doppel[] pDoppels)
+    {
+        doppels = pDoppels;
+    }
+
+    void HandleDoppelSwap()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha1)) { DoppelSwap(0); }
+        if (Input.GetKeyDown(KeyCode.Alpha2)) { DoppelSwap(1); }
+        //if (Input.GetKeyDown(KeyCode.Alpha3)) { DoppelSwap(3); }
+    }
+
+    void DoppelSwap(int index)
+    {
+        if (doppelSwapCD < 0.01f)
+        {
+            doppelDest = trfm.position;
+            trfm.position = doppels[index].trfm.position;
+            SetRotation(doppels[index].head.eulerAngles.x, doppels[index].objTrfm.eulerAngles.y);
+            doppels[index].trfm.position = doppelDest;            
+            doppels[index].SyncTrfm(true);
+
+            doppelSwapCD = 1;
+        }        
+    }
+
+    #endregion
+
+    #region ANIMATIONS
 
     [SerializeField] float targetYRot, targetXRot;
     Vector3 eulerAngles;
@@ -724,16 +839,18 @@ public class PlayerController : NetworkObject
     bool playRunSFX;
     void HandleRunSFX()
     {
-        audio.ToggleRun(anyMovementKey && OnGround() && !vanished);
+        playerAudio.ToggleRun(anyMovementKey && OnGround() && !vanished);
     }
+
+    #endregion
 
     #region HELPERS
 
-    void SetHP(ushort value, bool sync = true)
+    void SetHP(int value, bool sync = true)
     {
         uiHandler.SetHP(value);
         hpScript.HP = value;
-        if (sync) { hpScript.SyncHP(); }        
+        //if (sync) { hpScript.SyncHP(); }        
     }
 
     void SetMana(int value)
