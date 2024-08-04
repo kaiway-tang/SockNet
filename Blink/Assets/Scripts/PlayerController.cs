@@ -356,6 +356,9 @@ public class PlayerController : NetworkObject
 
     #endregion
 
+//  TODO...
+//  Energy, movement speed
+
     #region NETWORKING
 
     public override void AssignObjID(ushort ID)

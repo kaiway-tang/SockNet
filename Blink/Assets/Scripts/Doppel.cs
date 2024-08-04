@@ -64,6 +64,8 @@ public class Doppel : NetworkObject
         slashHitbox.Init(ID);
 
         NetworkManager.SetBufferUShort(buffer16, ID);
+        NetworkManager.SetBufferUShort(buffer15, ID);
+        NetworkManager.SetBufferUShort(buffer9, ID);
         NetworkManager.SetBufferUShort(buffer7, ID);
         NetworkManager.SetBufferUShort(buffer4, ID);
 
@@ -71,10 +73,14 @@ public class Doppel : NetworkObject
     }
 
     byte[] buffer16 = new byte[16];
+    byte[] buffer15 = new byte[15];
+    byte[] buffer9 = new byte[9];
     byte[] buffer7 = new byte[7];
     byte[] buffer4 = new byte[4];
     const int FUNCTION_ID = 2;
-    const int TRFM_UPDATE = 0, EVENT_ID_UPDATE = 1, SET_TARGET = 2, HP_UPDATE = 223;
+    const int TRFM_UPDATE = 0,
+        EVENT_ID_UPDATE = 1, SET_TARGET = 2, SET_ANCHOR_POS = 3, SET_STRAFE_POINTS = 4, SET_STRAFE_STATE = 5,
+        HP_UPDATE = 223;
     public override void NetworkUpdate(byte[] buffer)
     {
         if (buffer[FUNCTION_ID] == HP_UPDATE) { hpScript.HandleSync(buffer); }        
@@ -91,6 +97,8 @@ public class Doppel : NetworkObject
             if (buffer[15] == 1) { missingAnchorPos = 3; }            
         }
 
+        if (buffer[FUNCTION_ID] == EVENT_ID_UPDATE) { eventID = NetworkManager.GetBufferUInt(buffer, 3); }
+
         if (buffer[FUNCTION_ID] == SET_TARGET)
         {
             if (buffer[3] == 255)
@@ -99,27 +107,27 @@ public class Doppel : NetworkObject
             }
             else
             {
+                if (!hasTarget)
+                {
+                    //NOTE: play horn warning
+                    if (attackTimer < 0.4f) { attackTimer = 0.4f; }
+                    targettingTimer = 25;
+                }
+
                 hasTarget = true;
                 target = opponents[buffer[3]];
-            }            
-
-            if (!hasTarget)
-            {
-                //NOTE: play horn warning
-                if (attackTimer < 0.4f) { attackTimer = 0.4f; }
-                hasTarget = true;
-                targettingTimer = 25;
             }
-
-            if (hasTarget) { SetStrafePoints(); }
         }
 
-        if (buffer[FUNCTION_ID] == EVENT_ID_UPDATE) { eventID = NetworkManager.GetBufferUInt(buffer, 3); }
-    }
+        if (buffer[FUNCTION_ID] == SET_ANCHOR_POS) { anchorPos = NetworkManager.GetBufferCoords(buffer, 3); }
 
-    public void OnDamage(ushort amount, ushort sourceID)
-    {
-        //hpScript.SyncHP();
+        if (buffer[FUNCTION_ID] == SET_STRAFE_POINTS)
+        {
+            leftStrafePoint = NetworkManager.GetBufferCoords(buffer, 3);
+            rightStrafePoint = NetworkManager.GetBufferCoords(buffer, 9);
+        }
+
+        if (buffer[FUNCTION_ID] == SET_STRAFE_STATE) { strafeToLeft = buffer[3] == 1; }
     }
 
     public void SyncTrfm(bool resetAnchorPos)
@@ -143,7 +151,33 @@ public class Doppel : NetworkObject
         NetworkManager.Send(buffer7);
     }
 
+    void SyncAnchor()
+    {
+        buffer9[FUNCTION_ID] = SET_ANCHOR_POS;
+        NetworkManager.SetBufferCoords(buffer9, anchorPos, 3);
+        NetworkManager.Send(buffer9);
+    }
+
+    void SyncStrafePoints()
+    {
+        buffer15[FUNCTION_ID] = SET_STRAFE_POINTS;
+        NetworkManager.SetBufferCoords(buffer15, leftStrafePoint, 3);
+        NetworkManager.SetBufferCoords(buffer15, rightStrafePoint, 9);
+        NetworkManager.Send(buffer15);
+    }
+
+    void SyncStrafeDirection()
+    {
+        buffer4[FUNCTION_ID] = SET_STRAFE_STATE;
+        buffer4[3] = (byte)(strafeToLeft ? 1 : 0);
+        NetworkManager.Send(buffer4);
+    }
+
     #endregion
+    public void OnDamage(ushort amount, ushort sourceID)
+    {
+        //hpScript.SyncHP();
+    }
 
     private void Update()
     {
@@ -273,6 +307,7 @@ public class Doppel : NetworkObject
                 if (missingAnchorPos < 1)
                 {
                     anchorPos = trfm.position;
+                    if (isLocal) { SyncAnchor(); }
                 }
                 return;
             }
@@ -291,6 +326,7 @@ public class Doppel : NetworkObject
                 if (Vector3.SqrMagnitude(leftStrafePoint - trfm.position) < 1)
                 {
                     strafeToLeft = false;
+                    if (isLocal) { SyncStrafeDirection(); }                    
                 }
             }
             else
@@ -300,6 +336,7 @@ public class Doppel : NetworkObject
                 if (Vector3.SqrMagnitude(rightStrafePoint - trfm.position) < 1)
                 {
                     strafeToLeft = true;
+                    if (isLocal) { SyncStrafeDirection(); }
                 }
             }
         }
