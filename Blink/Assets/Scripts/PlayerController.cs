@@ -698,6 +698,11 @@ public class PlayerController : NetworkObject
         }
     }
 
+    public void ClearEndText()
+    {
+        endText.sprite = null;
+    }
+
     #endregion
 
     #region DOPPELS

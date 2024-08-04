@@ -398,7 +398,11 @@ public class Doppel : NetworkObject
                     }
                 }
             }
-
+            if (hasTarget)
+            {
+                SetStrafePoints();
+                SyncStrafePoints();
+            }
             SyncTarget(index);
         }        
     }

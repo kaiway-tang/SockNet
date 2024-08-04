@@ -84,10 +84,10 @@ public class TDMManager : NetworkObject
 
     void ClearEntities()
     {
-        if (blueDoppels[0]) { Destroy(blueDoppels[0]); }
-        if (blueDoppels[1]) { Destroy(blueDoppels[1]); }
-        if (redDoppels[0]) { Destroy(redDoppels[0]); }
-        if (redDoppels[1]) { Destroy(redDoppels[1]); }
+        if (blueDoppels[0]) { blueDoppels[0].hpScript.End(); }
+        if (blueDoppels[1]) { blueDoppels[1].hpScript.End(); }
+        if (redDoppels[0]) { redDoppels[0].hpScript.End(); }
+        if (redDoppels[1]) { redDoppels[1].hpScript.End(); }
 
         teamBlue.Clear();
         teamRed.Clear();
@@ -125,6 +125,7 @@ public class TDMManager : NetworkObject
         else
         {
             ClearEntities();
+            PlayerController.self.ClearEndText();
             matchState = STARTING;
         }
     }
