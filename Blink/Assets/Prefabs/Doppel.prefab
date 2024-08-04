@@ -301,6 +301,10 @@ PrefabInstance:
       propertyPath: objs.Array.data[1]
       value: 
       objectReference: {fileID: 7237235198894719804}
+    - target: {fileID: 4542395017445493031, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
+      propertyPath: useDefaultBehavior
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4542395017445493057, guid: 8abcffeb6e7a9b64e891a5096a53313b, type: 3}
       propertyPath: m_RootOrder
       value: 0
@@ -446,7 +450,6 @@ MonoBehaviour:
   head: {fileID: 7237235198894719744}
   firepoint: {fileID: 7237235198894719751}
   shuriken: {fileID: 201928810244430043, guid: 2c2f859646ff2074ca8ee8053ea2bce6, type: 3}
-  normal: {fileID: 201928810244430043, guid: 2c2f859646ff2074ca8ee8053ea2bce6, type: 3}
   marker: {fileID: 201928810244430043, guid: 2af2571fd9d2bef418c2a04a0e256f8c, type: 3}
   slashHitbox: {fileID: 4926612945443198838}
   opponents: []

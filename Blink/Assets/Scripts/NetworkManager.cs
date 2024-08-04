@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class NetworkManager : MonoBehaviour
@@ -72,27 +73,31 @@ public class NetworkManager : MonoBehaviour
 #endif
     }
 
+    string url = "ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT;
     private void Start()
     {        
         if (connected) { return; }
 
         if (isWebGL)
         {
-            WebGL_Start("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
+            WebGL_Start();
         }
         else
         {
-            Exe_Start("ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT);
+            Exe_Start();
         }
 
         nextSync = 1;
     }
 
+    float reconnectCD;
     int lastSecond;
     private void Update()
     {
         //tmp.text = System.DateTime.Now.ToString() + System.DateTime.Now.Millisecond.ToString();
 
+        if (Input.GetKeyDown(KeyCode.R)) { SceneManager.LoadScene("TDM"); }
+        if (reconnectCD > 0) { reconnectCD--; }
 
         if (isWebGL) { WebGL_Update(); }
         SyncTime_Update();
@@ -112,6 +117,11 @@ public class NetworkManager : MonoBehaviour
             cubeFlashInd.SetActive(Mathf.RoundToInt(time) % 2 == 0);
             lastSecond = Mathf.RoundToInt(time);
         }
+    }
+
+    private void FixedUpdate()
+    {
+
     }
 
     void InitializeBufferSizes()
@@ -193,9 +203,15 @@ public class NetworkManager : MonoBehaviour
         return (uint)(buffer[startIndex] << 24 | buffer[startIndex + 1] << 16 | buffer[startIndex + 2] << 8 | buffer[startIndex + 3]);
     }
 
+    static float timeDelta = 0;
     public static float GetBufferDelta(byte[] buffer, int startIndex = 0)
     {
-        return time - GetBufferUShort(buffer, startIndex)/1000f;
+        timeDelta = time - GetBufferUShort(buffer, startIndex) / 1000f;
+        if (timeDelta < -0.001f)
+        {
+            timeDelta += 60;
+        }
+        return timeDelta;
     }
 
     const int INIT_MSG = 0, NET_OBJ_INIT = 1, SYNC_TIME_MSG = 3, CLIENT_DCD = 4;
@@ -226,19 +242,23 @@ public class NetworkManager : MonoBehaviour
     private static ClientWebSocket webSocket = null;
     private static CancellationTokenSource cancellation = new CancellationTokenSource();
 
-    async void Exe_Start(string url)
+    async void Exe_Start()
     {
         await Connect(new Uri(url));
     }
 
+    bool isConnecting;
     private async Task Connect(Uri uri)
     {
+        if (isConnecting) { return; }
+        isConnecting = true;
         webSocket = new ClientWebSocket();
         await webSocket.ConnectAsync(uri, cancellation.Token);
         //Debug.Log("WebSocket connection established!");
 
         // Start listening for incoming messages
         connected = true;
+        isConnecting = false;
         byte[] initialMessage = { 0, 0, 0 };
         await ExeSend(initialMessage);
         SyncTime();
@@ -296,7 +316,25 @@ public class NetworkManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("WebSocket is not connected.");
+            Debug.LogWarning("WebSocket is not connected: " + webSocket.State);
+            //reconnect?
+        }
+    }
+
+    private async Task HandleDisconnection()
+    {
+        connected = false;
+        if (!cancellation.Token.IsCancellationRequested)
+        {
+            cancellation.Cancel();
+        }
+
+        cancellation = new CancellationTokenSource();
+        if (reconnectCD <= 0)
+        {
+            reconnectCD = 5;
+            Debug.Log("Reconnecting...");
+            await Connect(new Uri(url));
         }
     }
 
@@ -338,9 +376,9 @@ public class NetworkManager : MonoBehaviour
 
 //#if UNITY_WEBGL && !UNITY_EDITOR
 
-    void WebGL_Start(string address)
+    void WebGL_Start()
     {
-        Connect(address);
+        Connect(url);
     }
 
     private void WebGL_Update()

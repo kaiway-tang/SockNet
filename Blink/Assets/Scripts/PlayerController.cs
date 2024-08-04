@@ -20,7 +20,7 @@ public class PlayerController : NetworkObject
     [SerializeField] bool isLocal;
 
     [SerializeField] GroundDetect groundDetect;
-    [SerializeField] HPEntity hpScript;
+    public HPEntity hpScript;
     [SerializeField] Collider hurtbox;
     bool dead, invuln;
 
@@ -47,6 +47,7 @@ public class PlayerController : NetworkObject
     new void Start()
     {
         hpScript.OnDamage += GetComponent<PlayerController>().OnDamage;
+        hpScript.OnHeal += GetComponent<PlayerController>().OnHeal;
         hpScript.useDefaultBehavior = false;
         playerTrfm.parent = null;
         SetMana(100);
@@ -81,9 +82,9 @@ public class PlayerController : NetworkObject
         if (isLocal)
         {
             if (Input.GetKeyDown(KeyCode.Space)) { Jump(); }
-            if (UpdateKeyStatuses()) { SendTrfm(); }
+            if (UpdateKeyStatuses()) { SyncTrfm(); }
 
-            if (updateTimeout < 0) { SendTrfm(); }
+            if (updateTimeout < 0) { SyncTrfm(); }
             updateTimeout -= Time.deltaTime;
 
             HandleRotationInput();
@@ -113,7 +114,7 @@ public class PlayerController : NetworkObject
         {
             slashTimer -= Time.deltaTime;
             rb.velocity = Vector3.zero;
-            if (slashHitbox.col.enabled && slashTimer < 0.1f)
+            if (slashHitbox.col.enabled && slashTimer < 0.3f)
             {
                 slashHitbox.Deactivate();
             }
@@ -227,10 +228,18 @@ public class PlayerController : NetworkObject
                 buffer4[3] = 1;
                 NetworkManager.Send(buffer4);
             }
-            if (Input.GetKeyDown(KeyCode.M))
+
+            if (Input.GetKey(KeyCode.RightAlt))
             {
-                mana += 100000;
-            }
+                if (Input.GetKeyDown(KeyCode.M))
+                {
+                    mana += 100000;
+                }
+                if (Input.GetKey(KeyCode.H))
+                {
+                    TDMManager.HealLocalTeam(999);
+                }
+            }            
         }
 
         if (Input.GetKeyUp(KeyCode.LeftShift))
@@ -260,7 +269,7 @@ public class PlayerController : NetworkObject
         }
         
         transform.position = playerTrfm.position + camTrfm.forward * (slashRayDist - 2) + Vector3.up * 1f;
-        if (isLocal) { SendTrfm(); }
+        if (isLocal) { SyncTrfm(); }
 
         slashHitbox.trfm.position = (slashVect + playerTrfm.position) / 2f;
         slashHitbox.trfm.rotation = camTrfm.rotation;
@@ -272,16 +281,19 @@ public class PlayerController : NetworkObject
 
         playerAudio.PlaySlash();
         slashFX.Play();
-        slashTimer = 0.3f;
+        slashTimer = 0.4f;
     }
 
     [SerializeField] GameObject swordObj;
     [SerializeField] GameObject headObj;
     [SerializeField] GameObject UIObj;
+    [SerializeField] SpriteRenderer crosshair;
+    [SerializeField] Color maroon, grey;
+    
     void CastVanish()
     {
         activeClone = Instantiate(clone, trfm.position, playerTrfm.rotation).GetComponent<Clone>();
-        activeClone.Init(playerTrfm.position, hpScript.HP, camTrfm.rotation, swordTrfm, sincycle);
+        activeClone.Init(playerTrfm.position, hpScript.HP, camTrfm.rotation, swordTrfm, sincycle, opponents, objID);
 
         targetTrfm = activeClone.transform;
         posTracker.trfm = activeClone.transform;
@@ -298,7 +310,12 @@ public class PlayerController : NetworkObject
         }
 
         EnableHurtbox(false);
-        vanishInvuln = 0.5f;
+        vanishInvuln = 1f;
+
+        if (isLocal) {
+            playerAudio.PlayEnterVanish();
+            crosshair.color = grey;
+        }                
 
         vanished = true;
     }
@@ -310,6 +327,7 @@ public class PlayerController : NetworkObject
             buffer4[2] = 2;
             buffer4[3] = 0;
             NetworkManager.Send(buffer4);
+            crosshair.color = maroon;
         }
         else
         {
@@ -332,8 +350,18 @@ public class PlayerController : NetworkObject
         targetTrfm = trfm;
         posTracker.trfm = trfm;
 
+        playerAudio.PlayExitVanish();
+
         if (activeClone) { activeClone.End(); }        
         vanished = false;
+    }
+
+    Color col;
+    void SetVignetteAlpha(SpriteRenderer renderer, float alpha)
+    {
+        col = renderer.color;
+        col.a = alpha;
+        renderer.color = col;
     }
 
     void EnableHurtbox(bool enable)
@@ -364,6 +392,7 @@ public class PlayerController : NetworkObject
     public override void AssignObjID(ushort ID)
     {
         base.AssignObjID(ID);
+        posTracker.objID = ID;
 
         if (isLocal)
         {
@@ -386,6 +415,7 @@ public class PlayerController : NetworkObject
 
     public void AssignTeam(ushort pTeamID)
     {
+        hpScript.teamID = pTeamID;
         //buffer6[FUNCTION_ID] = TEAM_UPDATE;
         //NetworkManager.SetBufferUShort(buffer6, pTeamID, 3);
         //NetworkManager.Send(buffer6);
@@ -423,7 +453,7 @@ public class PlayerController : NetworkObject
 
         NetworkManager.Send(buffer20);
     }
-    public void SendTrfm()
+    public void SyncTrfm()
     {
         updateTimeout = 0.2f;
         if (!IsConnected()) { return; }
@@ -448,7 +478,7 @@ public class PlayerController : NetworkObject
 
     const int FUNCTION_ID = 2;
     const int TRFM_UPDATE = 0, PROJECTILE_UPDATE = 1, VANISH_UPDATE = 2, SLASH_UPDATE = 3, JUMP_UPDATE = 4, 
-        TEAM_UPDATE = 5, HP_UPDATE = 223;
+        TEAM_UPDATE = 5, HP_UPDATE = 223, DEATH_UPDATE = 222;
     public override void NetworkUpdate(byte[] buffer)
     {        
         if (buffer[FUNCTION_ID] == HP_UPDATE)
@@ -555,7 +585,7 @@ public class PlayerController : NetworkObject
 
         if (Mathf.Abs(xMouse) > 0.1f && updateTimeout < 0.05f + Mathf.Abs(xMouse) * 0.1f && updateTimeout < 0.15f)
         {
-            SendTrfm();
+            SyncTrfm();
         }
     }
 
@@ -644,16 +674,20 @@ public class PlayerController : NetworkObject
         calcHP = hpScript.HP - amount;
 
         if (calcHP < 0.01)
-        {            
-            Debug.Log("lethal");
+        {           
             SetHP(0);
-            hpScript.SyncHP(HPEntity.SYNC_HP, Tools.RandomEventID());
             HandleDeath();
         }
         else
         {
-            SetHP((ushort)calcHP);
+            SetHP((ushort)calcHP, false);
         }
+    }
+
+    public void OnHeal(ushort amount)
+    {
+        Debug.Log("healed to: " + hpScript.HP);
+        SetHP(hpScript.HP, false);
     }
 
     [SerializeField] SpriteRenderer endText;
@@ -675,9 +709,12 @@ public class PlayerController : NetworkObject
                 if (doppels[i])
                 {
                     SetHP(doppels[i].hpScript.HP);
-                    DoppelSwap(i);
-                    doppels[i].hpScript.TakeDamage(9999, 0, 0, HPEntity.SYNC_HP, Tools.RandomEventID());
-                    doppels[i].hpScript.End();
+                    if (isLocal)
+                    {                        
+                        DoppelSwap(i);                        
+                        //doppels[i].hpScript.End();
+                    }
+                    doppels[i].hpScript.TakeDamage(9999, 0, 0, HPEntity.DONT_SYNC, Tools.RandomEventID());
                     dead = false;
                     break;
                 }
@@ -707,8 +744,8 @@ public class PlayerController : NetworkObject
 
     #region DOPPELS
 
-    public static List<PositionTracker> opponents = new List<PositionTracker>();
-    [SerializeField] Doppel[] doppels;
+    public List<PositionTracker> opponents = new List<PositionTracker>();
+    public Doppel[] doppels;
 
     float doppelSwapCD;
     Vector3 doppelDest;
@@ -736,6 +773,7 @@ public class PlayerController : NetworkObject
             doppels[index].SyncTrfm(true);
 
             doppelSwapCD = 1;
+            SyncTrfm();
         }        
     }
 
@@ -854,11 +892,11 @@ public class PlayerController : NetworkObject
 
     #region HELPERS
 
-    void SetHP(int value, bool sync = true)
+    public void SetHP(int value, bool sync = true)
     {
         uiHandler.SetHP(value);
         hpScript.HP = value;
-        //if (sync) { hpScript.SyncHP(); }        
+        if (sync) { hpScript.SyncHP(1, Tools.RandomEventID()); }        
     }
 
     void SetMana(int value)

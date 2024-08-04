@@ -25,6 +25,8 @@ public class TDMManager : NetworkObject
         NetworkManager.SetBufferUShort(buffer3, 1);
     }
 
+    #region MATCH_START
+
     void StartMatch()
     {
         NetworkManager.players[64].gamemode = PlayerController.GM_TDM;
@@ -69,6 +71,9 @@ public class TDMManager : NetworkObject
         teamBlue.Add(NetworkManager.players[64].posTracker);
         teamRed.Add(NetworkManager.players[65].posTracker);
 
+        NetworkManager.players[64].opponents = teamRed;
+        NetworkManager.players[65].opponents = teamBlue;
+
         blueDoppels[0].Init(TEAM_BLUE, NetworkManager.players[64], teamRed, PlayerController.playerObjID == 64);
         blueDoppels[1].Init(TEAM_BLUE, NetworkManager.players[64], teamRed, PlayerController.playerObjID == 64);
 
@@ -81,6 +86,8 @@ public class TDMManager : NetworkObject
         NetworkManager.players[64].AssignDoppels(blueDoppels);
         NetworkManager.players[65].AssignDoppels(redDoppels);
     }
+
+    #endregion
 
     void ClearEntities()
     {
@@ -120,6 +127,7 @@ public class TDMManager : NetworkObject
         if (matchState == STARTING)
         {
             StartMatch();
+            PlayerController.self.ClearEndText();
             matchState = IN_PROGRESS;
         }
         else
@@ -129,6 +137,17 @@ public class TDMManager : NetworkObject
             matchState = STARTING;
         }
     }
+
+    #region GAMEPLAY
+
+    public static void HealLocalTeam(ushort amount)
+    {
+        PlayerController.self.hpScript.Heal(100, HPEntity.SYNC_HP, Tools.RandomEventID());
+        if (PlayerController.self.doppels[0]) { PlayerController.self.doppels[0].hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID()); }
+        if (PlayerController.self.doppels[1]) { PlayerController.self.doppels[1].hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID()); }
+    }
+
+    #endregion
 
     byte[] buffer3 = new byte[3];
     const int FUNCTION_ID = 2;

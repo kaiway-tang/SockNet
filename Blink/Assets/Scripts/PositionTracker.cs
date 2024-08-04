@@ -5,7 +5,7 @@ using UnityEngine;
 public class PositionTracker : MonoBehaviour
 {
     public Transform trfm;
-    int trackerID;
+    public ushort objID;
     private void Start()
     {
         trfm = transform;

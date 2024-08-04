@@ -311,6 +311,37 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!1 &2630746351036119840
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4197916094503715395}
+  m_Layer: 0
+  m_Name: EmptyTrfm
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4197916094503715395
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2630746351036119840}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8862095364870542318}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2989247974696865925
 GameObject:
   m_ObjectHideFlags: 0
@@ -343,6 +374,7 @@ Transform:
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 7139711996331557086}
+  - {fileID: 4197916094503715395}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -375,9 +407,11 @@ MonoBehaviour:
   meshObj: {fileID: 7139711996331557086}
   camTrfm: {fileID: 5808718839431790649}
   swordTrfm: {fileID: 1623035462598749874}
+  emptyTrfm: {fileID: 4197916094503715395}
   hpScript: {fileID: 3356370074419118429}
   uiHandler: {fileID: 4853878794084978025}
   billboard: {fileID: 7833371770495530545}
+  opponents: []
   bobRate: 0.4
   bobStrength: 4
   yBobMultiplier: 0.015

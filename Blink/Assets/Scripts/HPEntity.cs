@@ -14,13 +14,17 @@ public class HPEntity : MonoBehaviour
     public GameObject deathFX;
     public delegate void DamageDelegate(ushort amount, ushort sourceID);
     public event DamageDelegate OnDamage;
+    public delegate void HealDelegate(ushort amount);
+    public event HealDelegate OnHeal;
 
     public bool useDefaultBehavior = true;
 
     [SerializeField] UIHandler uiHandler;
 
     [SerializeField] bool dontSync;
-    [SerializeField] GameObject[] objs;  
+    [SerializeField] GameObject[] objs;
+
+    const int FUNCTION_ID = 2, DEATH_UPDATE = 222, HP_UPDATE = 223;
 
     protected void Start()
     {
@@ -35,7 +39,12 @@ public class HPEntity : MonoBehaviour
     {
         if (!ValidEventID(eventID)) { return; }
         HP += amount;
-        SyncHP(syncMethod);
+        if (HP > 100) { HP = 100; }
+        if (uiHandler) { uiHandler.SetHP(HP); }
+
+        OnHeal?.Invoke(amount);
+
+        if (syncMethod > 0) { SyncHP(syncMethod); }        
     }
 
     public const byte DONT_SYNC = 0, SYNC_HP = 1, SYNC_DMG = 2;
@@ -43,7 +52,7 @@ public class HPEntity : MonoBehaviour
     public void TakeDamage(ushort amount, ushort sourceID, ushort teamID = 0, byte syncMethod = DONT_SYNC, uint eventID = 0)
     {
         if (!ValidEventID(eventID)) { return; }
-        if (amount < 1) { return; }        
+        if (amount < 1) { return; }
 
         lastDamageAmount = amount;
 
@@ -124,6 +133,7 @@ public class HPEntity : MonoBehaviour
     {
         if (eventIDOverride > 0) { CacheEventID(eventIDOverride); }
         if (dontSync) { return; }
+        HPBuffer[FUNCTION_ID] = HP_UPDATE;
         HPBuffer[3] = (byte)(syncMethod - 1);
         NetworkManager.SetBufferUInt(HPBuffer, lastEventID, 6);
 
@@ -154,7 +164,6 @@ public class HPEntity : MonoBehaviour
         {
             if (hpUpdate < HP)
             {
-                Debug.Log("New: " + hpUpdate + " from: " + HP);
                 TakeDamage((ushort)(HP - hpUpdate), 0, TEAM_NONE, DONT_SYNC, eventIDUpdate);
             }
             else if (hpUpdate > HP)
