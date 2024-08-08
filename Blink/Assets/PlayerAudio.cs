@@ -10,6 +10,8 @@ public class PlayerAudio : MonoBehaviour
     [SerializeField] AudioSource enterVanish;
     [SerializeField] AudioSource exitVanish;
 
+    [SerializeField] AudioSource[] drumTaps;
+
     public void PlaySlash()
     {
         slash.Play();
@@ -27,6 +29,11 @@ public class PlayerAudio : MonoBehaviour
     public void PlayExitVanish()
     {
         exitVanish.Play();
+    }
+
+    public void PlayDrumTap(int index)
+    {
+        drumTaps[index].Play();
     }
 
     public void ToggleRun(bool on)

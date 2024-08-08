@@ -12,9 +12,18 @@ public class TDMManager : NetworkObject
     [SerializeField] GameObject doppel;
     [SerializeField] Doppel[] blueDoppels;
     [SerializeField] Doppel[] redDoppels;
+
+    [SerializeField] GameObject doppelPointersParent;
+    [SerializeField] DoppelPointer[] doppelPointers;
+
+    [SerializeField] GameObject TutorialMap, TDMMap;
+
+    static int teamSize;
+
     // Start is called before the first frame update
     new void Start()
     {
+
         base.Start();
         NetworkManager.networkObjects.Add(1, GetComponent<TDMManager>());
 
@@ -23,6 +32,11 @@ public class TDMManager : NetworkObject
 
         buffer3 = new byte[3];
         NetworkManager.SetBufferUShort(buffer3, 1);
+
+        teamSize = 3;
+        PlayerController.self.doppels = new Doppel[teamSize];
+        blueDoppels = new Doppel[teamSize];
+        redDoppels = new Doppel[teamSize];
     }
 
     #region MATCH_START
@@ -32,34 +46,38 @@ public class TDMManager : NetworkObject
         NetworkManager.players[64].gamemode = PlayerController.GM_TDM;
         NetworkManager.players[65].gamemode = PlayerController.GM_TDM;
 
+        TutorialMap.SetActive(false);
+        TDMMap.SetActive(true);
+
+        doppelPointersParent.SetActive(true);
+
         CreateDoppels();
         SetTeams();
     }
 
     void CreateDoppels()
     {
-        blueDoppels[0] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();
-        blueDoppels[1] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();
-        teamBlue.Add(blueDoppels[0].posTracker);
-        teamBlue.Add(blueDoppels[1].posTracker);
-        Debug.Log(teamBlue);
+        for (int i = 0; i < teamSize; i++)
+        {
+            blueDoppels[i] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();
+            teamBlue.Add(blueDoppels[i].posTracker);
+            blueDoppels[i].AssignObjID((ushort)(1000 + i));            
 
-        blueDoppels[0].AssignObjID(1000);
-        blueDoppels[1].AssignObjID(1001);
+            redDoppels[i] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();
+            teamRed.Add(redDoppels[i].posTracker);
+            redDoppels[i].AssignObjID((ushort)(1100 + i));
 
-        redDoppels[0] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();
-        redDoppels[1] = Instantiate(doppel, Vector3.zero, Quaternion.identity).GetComponent<Doppel>();        
-        teamRed.Add(redDoppels[0].posTracker);
-        teamRed.Add(redDoppels[1].posTracker);
-
-        redDoppels[0].AssignObjID(1002);
-        redDoppels[1].AssignObjID(1003);
+            if (PlayerController.playerObjID == 64) { doppelPointers[i].doppel = blueDoppels[i].trfm; }
+            else { doppelPointers[i].doppel = redDoppels[i].trfm; }
+        }
 
         blueDoppels[0].trfm.position = blueStart.position + Vector3.right * 5;
         blueDoppels[1].trfm.position = blueStart.position + Vector3.right * -5;
+        blueDoppels[2].trfm.position = blueStart.position + Vector3.forward * -5;
 
         redDoppels[0].trfm.position = redStart.position + Vector3.right * 5;
         redDoppels[1].trfm.position = redStart.position + Vector3.right * -5;
+        redDoppels[2].trfm.position = redStart.position + Vector3.forward * 5;
     }
 
     PlayerController localPlayer, opposingPlayer;
@@ -74,11 +92,11 @@ public class TDMManager : NetworkObject
         NetworkManager.players[64].opponents = teamRed;
         NetworkManager.players[65].opponents = teamBlue;
 
-        blueDoppels[0].Init(TEAM_BLUE, NetworkManager.players[64], teamRed, PlayerController.playerObjID == 64);
-        blueDoppels[1].Init(TEAM_BLUE, NetworkManager.players[64], teamRed, PlayerController.playerObjID == 64);
-
-        redDoppels[0].Init(TEAM_RED, NetworkManager.players[65], teamBlue, PlayerController.playerObjID == 65);
-        redDoppels[1].Init(TEAM_RED, NetworkManager.players[65], teamBlue, PlayerController.playerObjID == 65);
+        for (int i = 0; i < teamSize; i++)
+        {
+            blueDoppels[i].Init(TEAM_BLUE, NetworkManager.players[64], teamRed, PlayerController.playerObjID == 64, i);
+            redDoppels[i].Init(TEAM_RED, NetworkManager.players[64], teamBlue, PlayerController.playerObjID == 65, i);
+        }
 
         NetworkManager.players[64].trfm.position = blueStart.position;
         NetworkManager.players[65].trfm.position = redStart.position;
@@ -89,19 +107,34 @@ public class TDMManager : NetworkObject
 
     #endregion
 
+    public void RevealOpponents(bool reveal)
+    {
+        for (int i = 0; i < teamSize; i++)
+        {
+            if (PlayerController.playerObjID == 64 && redDoppels[i]) { redDoppels[i].beacon.SetActive(reveal); }
+            if (PlayerController.playerObjID == 65 && blueDoppels[i]) { blueDoppels[i].beacon.SetActive(reveal); }
+        }
+        if (PlayerController.playerObjID == 64) { NetworkManager.players[65].beacon.SetActive(reveal); }
+        if (PlayerController.playerObjID == 65) { NetworkManager.players[64].beacon.SetActive(reveal); }
+    }
+
     void ClearEntities()
     {
-        if (blueDoppels[0]) { blueDoppels[0].hpScript.End(); }
-        if (blueDoppels[1]) { blueDoppels[1].hpScript.End(); }
-        if (redDoppels[0]) { redDoppels[0].hpScript.End(); }
-        if (redDoppels[1]) { redDoppels[1].hpScript.End(); }
+        for (int i = 0; i < teamSize; i++)
+        {
+            if (blueDoppels[i]) { blueDoppels[i].hpScript.End(); }
+            if (redDoppels[i]) { redDoppels[i].hpScript.End(); }
+        }
 
         teamBlue.Clear();
         teamRed.Clear();
 
-        for (ushort i = 1000; i < 1004; i++)
+        doppelPointersParent.SetActive(false);
+
+        for (ushort i = 0; i < teamSize; i++)
         {
-            if (NetworkManager.networkObjects.ContainsKey(i)) { NetworkManager.networkObjects.Remove(i); }
+            if (NetworkManager.networkObjects.ContainsKey((ushort)(1000 + i))) { NetworkManager.networkObjects.Remove((ushort)(1000 + i)); }
+            if (NetworkManager.networkObjects.ContainsKey((ushort)(1100 + i))) { NetworkManager.networkObjects.Remove((ushort)(1100 + i)); }
         }        
     }
 
@@ -118,7 +151,7 @@ public class TDMManager : NetworkObject
 
         if (Input.GetKeyDown(KeyCode.Backspace))
         {
-            CreateDoppels();
+            RevealOpponents(true);
         }
     }
 
@@ -126,12 +159,14 @@ public class TDMManager : NetworkObject
     {
         if (matchState == STARTING)
         {
+            HealLocalTeam(999);
             StartMatch();
             PlayerController.self.ClearEndText();
             matchState = IN_PROGRESS;
         }
         else
         {
+            HealLocalTeam(999);
             ClearEntities();
             PlayerController.self.ClearEndText();
             matchState = STARTING;
@@ -142,9 +177,11 @@ public class TDMManager : NetworkObject
 
     public static void HealLocalTeam(ushort amount)
     {
-        PlayerController.self.hpScript.Heal(100, HPEntity.SYNC_HP, Tools.RandomEventID());
-        if (PlayerController.self.doppels[0]) { PlayerController.self.doppels[0].hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID()); }
-        if (PlayerController.self.doppels[1]) { PlayerController.self.doppels[1].hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID()); }
+        PlayerController.self.hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID());
+        for (int i = 0; i < teamSize; i++)
+        {
+            if (PlayerController.self.doppels[i]) { PlayerController.self.doppels[i].hpScript.Heal(amount, HPEntity.SYNC_HP, Tools.RandomEventID()); }
+        }        
     }
 
     #endregion

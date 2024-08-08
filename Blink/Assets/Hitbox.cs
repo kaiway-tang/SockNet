@@ -11,9 +11,10 @@ public class Hitbox : MonoBehaviour
     [SerializeField] uint eventID;
     public Transform trfm;
 
-    public void Init(ushort pOwnerID)
+    public void Init(ushort pOwnerID, ushort pTeamID)
     {
         ownerID = pOwnerID;
+        teamID = pTeamID;
         trfm = transform;
     }
 

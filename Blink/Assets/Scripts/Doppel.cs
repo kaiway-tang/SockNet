@@ -17,7 +17,7 @@ public class Doppel : NetworkObject
     Vector3 leftStrafePoint, rightStrafePoint;
     bool strafeToLeft;
 
-    [SerializeField] GameObject beacon;
+    public GameObject beacon;
     public HPEntity hpScript;
 
     public PositionTracker posTracker, target;
@@ -31,9 +31,10 @@ public class Doppel : NetworkObject
     [SerializeField] GroundDetect leftDetect, rightDetect;
 
     [SerializeField] PlayerAudio playerAudio;
-    [SerializeField] ParticleSystem slashFX;    
+    [SerializeField] ParticleSystem slashFX;
 
     public bool isLocal;
+    int doppelNumber;
 
     new void Start()
     {
@@ -41,11 +42,12 @@ public class Doppel : NetworkObject
 
         hpScript.OnDamage += GetComponent<Doppel>().OnDamage;
     }  
-    public void Init(ushort pTeamID, PlayerController pOwner, List<PositionTracker> pOpponents, bool pIsLocal)
+    public void Init(ushort pTeamID, PlayerController pOwner, List<PositionTracker> pOpponents, bool pIsLocal, int pDoppelNumber)
     {
         objTrfm.parent = null;
         teamID = pTeamID;
         hpScript.teamID = pTeamID;
+        slashHitbox.Init(objID, teamID);
         playerOwner = pOwner;
 
         opponents = pOpponents;
@@ -53,6 +55,8 @@ public class Doppel : NetworkObject
         if (!isLocal) { shuriken = marker; }
 
         missingAnchorPos = 3;
+
+        doppelNumber = pDoppelNumber;
     }
 
     #region NETWORKING
@@ -60,8 +64,7 @@ public class Doppel : NetworkObject
     public override void AssignObjID(ushort ID)
     {
         base.AssignObjID(ID);
-        hpScript.objID = ID;
-        slashHitbox.Init(ID);
+        hpScript.AssignObjID(ID);        
         posTracker.objID = ID;
 
         NetworkManager.SetBufferUShort(buffer16, ID);
@@ -70,7 +73,11 @@ public class Doppel : NetworkObject
         NetworkManager.SetBufferUShort(buffer7, ID);
         NetworkManager.SetBufferUShort(buffer5, ID);
 
-        if (isLocal) { SyncEventID(); }
+        if (isLocal) {
+            SyncEventID();
+            attackTimer = 0.5f;
+            SyncAttackTimer();
+        }
     }
 
     byte[] buffer16 = new byte[16];
@@ -81,6 +88,7 @@ public class Doppel : NetworkObject
     const int FUNCTION_ID = 2;
     const int TRFM_UPDATE = 0,
         EVENT_ID_UPDATE = 1, SET_TARGET = 2, SET_ANCHOR_POS = 3, SET_STRAFE_POINTS = 4, SET_STRAFE_STATE = 5, SET_ATK_TIMER = 6,
+        FIRE_SHURIKEN = 7,
         HP_UPDATE = 223;
     public override void NetworkUpdate(byte[] buffer)
     {
@@ -111,13 +119,16 @@ public class Doppel : NetworkObject
             {
                 if (!hasTarget)
                 {
-                    //NOTE: play horn warning
+                    if (combatTimer < 250)
+                    {
+                        if (combatTimer < 100) { PlayerController.self.playerAudio.PlayDrumTap(doppelNumber); }
+                        combatTimer = 250;
+                    }                    
                     if (attackTimer < 0.4f) { attackTimer = 0.4f; }
                     targettingTimer = 25;
                 }
 
                 hasTarget = true;                
-                Debug.Log("setting target: " + buffer[3]);
                 for (int i = 0; i < opponents.Count; i++)
                 {
                     if (opponents[i].objID == targetObjID) { target = opponents[i]; }
@@ -139,6 +150,15 @@ public class Doppel : NetworkObject
         {
             attackTimer = NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 3))
                 + NetworkManager.GetBufferDelta(buffer, 5);
+        }
+
+        if (buffer[FUNCTION_ID] == FIRE_SHURIKEN)
+        {
+            SetRotation(NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 14)),
+                NetworkManager.DecodePosValue(NetworkManager.GetBufferUShort(buffer, 12)));
+            Instantiate(shuriken, NetworkManager.GetBufferCoords(buffer, 6), firepoint.rotation)
+                .GetComponent<Projectile>().Init(objID, teamID, NetworkManager.GetBufferDelta(buffer, 4), HPEntity.SYNC_HP, eventID);
+            eventIDUsed = true;
         }
     }
 
@@ -197,7 +217,7 @@ public class Doppel : NetworkObject
     int combatTimer;
     public void OnDamage(ushort amount, ushort sourceID)
     {
-        combatTimer = 500;
+        combatTimer = 1000;
     }
 
     private void Update()
@@ -243,7 +263,7 @@ public class Doppel : NetworkObject
 
     float targetDistance, predictTime;
     float attackTimer;
-    uint eventID;
+    uint eventID; bool eventIDUsed;
 
     void HandleAttacking()
     {
@@ -252,6 +272,11 @@ public class Doppel : NetworkObject
             if (attackTimer > 0)
             {
                 attackTimer -= Time.deltaTime;
+                if (isLocal && eventIDUsed && attackTimer < 0.4f)
+                {
+                    SyncEventID();
+                    eventIDUsed = false;
+                }
             }
             else if (mana >= 100)
             {
@@ -260,12 +285,24 @@ public class Doppel : NetworkObject
                 if (targetDistance < 12.5f)
                 {
                     CastSlash(eventID);
+                    eventIDUsed = true;
                 }
                 else
                 {
-                    Instantiate(shuriken, firepoint.position, firepoint.rotation).GetComponent<Shuriken>().Init(0, teamID, 0, HPEntity.SYNC_HP, eventID);
-                }
-                if (isLocal) { SyncEventID(); }
+                    if (isLocal)
+                    {
+                        Instantiate(shuriken, firepoint.position, firepoint.rotation).GetComponent<Shuriken>().Init(0, teamID, 0, HPEntity.SYNC_HP, eventID);
+
+                        buffer16[FUNCTION_ID] = FIRE_SHURIKEN;
+                        NetworkManager.SetBufferTime(buffer16, 4);
+                        NetworkManager.SetBufferCoords(buffer16, firepoint.position, 6);
+                        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(objTrfm.eulerAngles.y), 12);
+                        NetworkManager.SetBufferUShort(buffer16, NetworkManager.EncodePosValue(head.eulerAngles.x), 14);
+                        NetworkManager.Send(buffer16);
+
+                        eventIDUsed = true;
+                    }                    
+                }                
                 mana -= 100;
             }
         }        
@@ -280,7 +317,7 @@ public class Doppel : NetworkObject
             predictTime = targetDistance * predictionMultiplier;
             if (predictTime > 0.6f) { predictTime = 0.6f; }            
             predictedPos = target.PredictedPosition(predictTime);
-            predictedPos.y = target.trfm.position.y;
+            predictedPos.y = target.trfm.position.y + 0.2f;
             emptyTrfm.forward = predictedPos - head.position;
             //emptyTrfm.forward = target.PredictedPosition(targetDistance * predictionMultiplier) - head.position;
             SetRotation(Tools.RotationalLerp(head.eulerAngles.x, emptyTrfm.eulerAngles.x, turnLerpRate), Tools.RotationalLerp(objTrfm.eulerAngles.y, emptyTrfm.eulerAngles.y, turnLerpRate));            
@@ -325,19 +362,14 @@ public class Doppel : NetworkObject
     {
         if (missingAnchorPos > 0)
         {
-            if (leftDetect.touchCount > 0 && rightDetect.touchCount > 0)
-            {                
-                missingAnchorPos--;
-                if (missingAnchorPos < 1)
-                {
-                    anchorPos = trfm.position;
-                    if (isLocal) { SyncAnchor(); }
-                }
-                return;
+            if (Physics.Raycast(trfm.position, Vector3.down, out rayHit, 16, Tools.terrainMask))
+            {
+                anchorPos = rayHit.point + Vector3.up * 0.75f;
+                missingAnchorPos = 0;
+                if (isLocal) { SyncAnchor(); }
             }
             else
             {
-                missingAnchorPos = 3;
                 return;
             }
         }
@@ -403,23 +435,28 @@ public class Doppel : NetworkObject
                 if (!opponents[i]) { opponents.RemoveAt(i); continue; }
             }
 
-            opponents.Sort((a, b) => Vector3.SqrMagnitude(trfm.position - a.trfm.position).CompareTo(Vector3.SqrMagnitude(trfm.position - b.trfm.position)));
+            opponents.Sort((b, a) => Vector3.SqrMagnitude(trfm.position - a.trfm.position).CompareTo(Vector3.SqrMagnitude(trfm.position - b.trfm.position)));
 
             for (int i = 0; i < opponents.Count; i++)
             {
-                if (!Physics.Linecast(head.position, opponents[i].trfm.position, Tools.terrainMask))
+                if (!Physics.Linecast(head.position, opponents[i].trfm.position + Vector3.up * 0.5f, Tools.terrainMask))
                 {
                     target = opponents[i];
                     index = (byte)i;
 
                     if (!hasTarget)
                     {
-                        //NOTE: play horn warning
-                        if (attackTimer < 0.4f)
+                        if (combatTimer < 100) { PlayerController.self.playerAudio.PlayDrumTap(doppelNumber); }
+                        if (combatTimer < 250) { combatTimer = 250; }
+                        if (combatTimer < 1)
                         {
-                            attackTimer = 0.4f;
-                            SyncAttackTimer();
-                        }
+                            //PlayerController.self.playerAudio.PlayDrumTap(doppelNumber);
+                            if (attackTimer < 0.4f)
+                            {
+                                attackTimer = 0.4f;
+                                SyncAttackTimer();
+                            }
+                        }                        
                         hasTarget = true;
                         targettingTimer = 25;
                     }

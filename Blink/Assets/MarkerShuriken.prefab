@@ -51,10 +51,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ownerID: 0
   teamID: 0
-  damage: 0
+  damage: 20
   syncMethod: 0
   eventID: 0
-  isMarker: 1
+  isMarker: 0
   trail: {fileID: 3416413821850582629}
   speed: 60
   modelTrfm: {fileID: 4674890376730661851}

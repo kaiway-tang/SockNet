@@ -74,6 +74,7 @@ public class NetworkManager : MonoBehaviour
     }
 
     string url = "ws://" + ENV.SPVCB8L_IP + ":" + ENV.DEFAULT_PORT;
+    //string url = "ws://" + ENV.PUBLIC_IP + ":" + ENV.DEFAULT_PORT;
     private void Start()
     {        
         if (connected) { return; }

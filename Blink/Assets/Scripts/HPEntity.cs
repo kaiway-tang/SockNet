@@ -28,11 +28,16 @@ public class HPEntity : MonoBehaviour
 
     protected void Start()
     {
-        HPBuffer = new byte[10];
-        NetworkManager.SetBufferUShort(HPBuffer, objID);
-        HPBuffer[2] = 223;
-
         lastEventIDs = new uint[8];
+    }
+
+    public void AssignObjID(ushort ID)
+    {
+        objID = ID;
+
+        HPBuffer = new byte[10];
+        HPBuffer[2] = 223;
+        NetworkManager.SetBufferUShort(HPBuffer, ID);
     }
 
     public void Heal(ushort amount, byte syncMethod = DONT_SYNC, uint eventID = 0)
@@ -168,6 +173,7 @@ public class HPEntity : MonoBehaviour
             }
             else if (hpUpdate > HP)
             {
+                Debug.Log("recv heal update: " + hpUpdate);
                 Heal((ushort)(hpUpdate - HP), DONT_SYNC, eventIDUpdate);
             }
         }

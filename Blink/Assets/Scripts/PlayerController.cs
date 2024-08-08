@@ -27,12 +27,13 @@ public class PlayerController : NetworkObject
     [SerializeField] PlayerUIHandler uiHandler;
     public static ushort playerObjID, teamID;
 
-    [SerializeField] PlayerAudio playerAudio;
+    public PlayerAudio playerAudio;
 
     public static PlayerController self;
     public Transform trfm;
     public Transform targetTrfm;
     public PositionTracker posTracker;
+    public GameObject beacon;
 
     private void Awake()
     {
@@ -52,8 +53,8 @@ public class PlayerController : NetworkObject
         playerTrfm.parent = null;
         SetMana(100);
         //playerObjID = objID;
-        hpScript.objID = objID;
-        slashHitbox.Init(objID);
+        hpScript.AssignObjID(objID);
+        slashHitbox.Init(objID, teamID);
 
         if (isLocal)
         {
@@ -90,6 +91,8 @@ public class PlayerController : NetworkObject
             HandleRotationInput();
             HandleAbilities();
             HandleDoppelSwap();
+
+            HandleInfoTab();
         }
 
         HandleTimers();
@@ -97,6 +100,20 @@ public class PlayerController : NetworkObject
     }
 
     #region UPDATE_CALLS
+
+    [SerializeField] GameObject infoTab;
+    void HandleInfoTab()
+    {
+        if (Input.GetKeyDown(KeyCode.Tab))
+        {
+            infoTab.SetActive(true);
+        }
+
+        if (Input.GetKeyUp(KeyCode.Tab))
+        {
+            infoTab.SetActive(false);
+        }
+    }
 
     void HandleTimers()
     {
@@ -131,7 +148,7 @@ public class PlayerController : NetworkObject
 
         if (doppelSwapCD > 0)
         {
-            doppelSwapCD--;
+            doppelSwapCD -= Time.deltaTime;
         }
     }
 
@@ -229,7 +246,7 @@ public class PlayerController : NetworkObject
                 NetworkManager.Send(buffer4);
             }
 
-            if (Input.GetKey(KeyCode.RightAlt))
+            if (Input.GetKey(KeyCode.RightShift))
             {
                 if (Input.GetKeyDown(KeyCode.M))
                 {
@@ -310,7 +327,7 @@ public class PlayerController : NetworkObject
         }
 
         EnableHurtbox(false);
-        vanishInvuln = 1f;
+        vanishInvuln = 1;
 
         if (isLocal) {
             playerAudio.PlayEnterVanish();
@@ -341,10 +358,9 @@ public class PlayerController : NetworkObject
             playerMeshes[i].enabled = true;
         }
 
-        if (vanishInvuln > 0.25f)
+        if (vanishInvuln > 0.5f)
         {
-            EnableHurtbox(true);
-            vanishInvuln = 0.25f;
+            vanishInvuln = 0.5f;
         }        
 
         targetTrfm = trfm;
@@ -398,9 +414,9 @@ public class PlayerController : NetworkObject
         {
             playerObjID = ID;
             NetworkManager.players.Add(ID, GetComponent<PlayerController>());
-        }        
-        hpScript.objID = ID;
-        slashHitbox.Init(ID);
+        }
+        hpScript.AssignObjID(ID);
+        slashHitbox.Init(ID, teamID);
         //Debug.Log("player received ID: " + ID);
 
         if (isLocal)
@@ -485,6 +501,8 @@ public class PlayerController : NetworkObject
         {
             hpScript.HandleSync(buffer);
         }
+
+        if (buffer[FUNCTION_ID] == DEATH_UPDATE) { self.endText.sprite = winText; }
 
         if (buffer[FUNCTION_ID] == TRFM_UPDATE) { HandleTrfmUpdate(buffer); }
 
@@ -675,7 +693,7 @@ public class PlayerController : NetworkObject
 
         if (calcHP < 0.01)
         {           
-            SetHP(0);
+            SetHP(0, false);
             HandleDeath();
         }
         else
@@ -686,7 +704,6 @@ public class PlayerController : NetworkObject
 
     public void OnHeal(ushort amount)
     {
-        Debug.Log("healed to: " + hpScript.HP);
         SetHP(hpScript.HP, false);
     }
 
@@ -698,7 +715,7 @@ public class PlayerController : NetworkObject
     {
         if (gamemode == GM_FFA)
         {
-            SceneManager.LoadScene("FFA");
+            //SceneManager.LoadScene("FFA");
             Respawn();
         }
         if (gamemode == GM_TDM)
@@ -708,13 +725,14 @@ public class PlayerController : NetworkObject
             {
                 if (doppels[i])
                 {
-                    SetHP(doppels[i].hpScript.HP);
+                    //SetHP(doppels[i].hpScript.HP, false);
                     if (isLocal)
                     {                        
-                        DoppelSwap(i);                        
+                        DoppelSwap(i);
+                        SetHP(doppels[i].hpScript.HP, true);
+                        doppels[i].hpScript.TakeDamage(9999, 0, 0, HPEntity.SYNC_HP, Tools.RandomEventID());
                         //doppels[i].hpScript.End();
-                    }
-                    doppels[i].hpScript.TakeDamage(9999, 0, 0, HPEntity.DONT_SYNC, Tools.RandomEventID());
+                    }                    
                     dead = false;
                     break;
                 }
@@ -724,13 +742,11 @@ public class PlayerController : NetworkObject
             {
                 if (isLocal)
                 {
+                    buffer4[FUNCTION_ID] = DEATH_UPDATE;
+                    NetworkManager.Send(buffer4);
                     endText.sprite = loseText;
-                }
-                else
-                {
-                    self.endText.sprite = winText;
-                }
-                Respawn();
+                    Respawn();
+                }                
             }
         }
     }
@@ -759,7 +775,7 @@ public class PlayerController : NetworkObject
     {
         if (Input.GetKeyDown(KeyCode.Alpha1)) { DoppelSwap(0); }
         if (Input.GetKeyDown(KeyCode.Alpha2)) { DoppelSwap(1); }
-        //if (Input.GetKeyDown(KeyCode.Alpha3)) { DoppelSwap(3); }
+        if (Input.GetKeyDown(KeyCode.Alpha3)) { DoppelSwap(2); }
     }
 
     void DoppelSwap(int index)
@@ -786,6 +802,8 @@ public class PlayerController : NetworkObject
     [SerializeReference] TextMeshProUGUI tmp;
     void FixedUpdate()
     {
+        if (isLocal && playerTrfm.position.y < -70) { hpScript.TakeDamage(999, 0, 0, HPEntity.SYNC_HP, Tools.RandomEventID()); }
+
         if (slashTimer > 0)
         {
             rb.velocity = Vector3.zero;

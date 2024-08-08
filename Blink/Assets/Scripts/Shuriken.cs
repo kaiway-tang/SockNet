@@ -67,7 +67,11 @@ public class Shuriken : Projectile
         trail.Stop();
         trail.transform.parent = null;
         Destroy(trail.gameObject, 5);
-        if (leaveShuriken) { modelTrfm.parent = null; }        
+        if (leaveShuriken)
+        {
+            modelTrfm.parent = null;
+            Destroy(modelTrfm, 60);
+        }              
         Destroy(gameObject);
     }
 }
